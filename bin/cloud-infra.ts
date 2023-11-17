@@ -3,6 +3,14 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { CloudStack } from '../lib/cloud-stack';
 import { OnPremStack } from '../lib/on-prem-stack';
+import { EC2StackProps } from '../lib/utils';
+
+const stackProps: EC2StackProps = {
+  sshPubKey: process.env.SSH_PUB_KEY || ' ',
+  cpuType: process.env.CPU_TYPE || 'x86_64',
+  instanceSize: process.env.INSTANCE_SIZE || 'LARGE',
+};
+
 
 const app = new cdk.App();
 new CloudStack(app, 'CloudStack', {
@@ -19,12 +27,12 @@ new CloudStack(app, 'CloudStack', {
   // env: { account: '123456789012', region: 'us-east-1' },
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
-
-
+  ...stackProps
 });
 
 new OnPremStack(app, 'OnPremStack', {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+  ...stackProps
 });
 
 app.synth();

@@ -53,3 +53,13 @@ cdk bootstrap
 * `cdk deploy`      deploy this stack to your default AWS account/region
 * `cdk diff`        compare deployed stack with current state
 * `cdk synth`       emits the synthesized CloudFormation template
+
+## Environment 
+
+Add `.env` file with content like below.
+
+```
+SSH_PUB_KEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD3f1cYH4...
+CPU_TYPE=x86_64
+INSTANCE_SIZE=LARGE
+```
