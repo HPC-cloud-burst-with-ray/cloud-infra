@@ -141,11 +141,11 @@ export class EC2NodeResources extends Construct{
                     InitFile.fromFileInline(
                         // Use CloudformationInit to copy a file to the EC2 instance
                         '/tmp/amazon-cloudwatch-agent.json',
-                        './resources/server/config/amazon-cloudwatch-agent.json',
+                        'lib/resources/server/config/amazon-cloudwatch-agent.json',
                     ),
                     InitFile.fromFileInline(
                         '/etc/config.sh',
-                        './resources/server/config/config.sh',
+                        'lib/resources/server/config/config.sh',
                     ),
                     InitFile.fromString(
                         // Use CloudformationInit to write a string to the EC2 instance
