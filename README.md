@@ -30,6 +30,7 @@ nvm --version
 ```
 nvm install 18
 npm install -g aws-cdk
+npm install @aws-cdk/aws-efs
 ```
 
 *how to init an empty project (no need to run again)*
