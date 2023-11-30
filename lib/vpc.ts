@@ -51,6 +51,8 @@ export class OnPremVpcResources extends Construct {
         // allow port range 30000 ~ 31000 for ray and also 6379
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(30000, 31000));
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(6379));
+        // also allow port 2049 for efs
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
     }
 }
 
@@ -90,5 +92,7 @@ export class CloudVpcResources extends Construct {
         // allow port range 30000 ~ 31000 for ray and also 6379
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(30000, 31000));
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(6379));
+        // also allow port 2049 for efs
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
     }
 }
