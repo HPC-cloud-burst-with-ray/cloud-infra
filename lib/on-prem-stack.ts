@@ -1,4 +1,5 @@
 import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
+import { aws_ec2 as ec2 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { OnPremVpcResources } from './vpc';
 import { EC2NodeResources } from './ec2';
@@ -17,6 +18,11 @@ export class OnPremStack extends Stack {
 
     // create onprem side vpc
     const onpremVpc = new OnPremVpcResources(this, 'OnPremVPC');
+
+    const cfnInstanceConnectEndpoint = new ec2.CfnInstanceConnectEndpoint(this, 'OnPremVpcInstanceEndpoint', {
+      subnetId: onpremVpc.vpc.privateSubnets[0].subnetId,
+      securityGroupIds: [onpremVpc.onPremSecurityGroup.securityGroupId]
+    });
 
     const fileSystem = new efs.FileSystem(this, 'OnPremEfsFileSystem', {
       vpc: onpremVpc.vpc,

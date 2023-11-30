@@ -5,12 +5,16 @@ import { CloudStack } from '../lib/cloud-stack';
 import { OnPremStack } from '../lib/on-prem-stack';
 import { EC2StackProps } from '../lib/utils';
 
+require('dotenv').config();
+
 const stackProps: EC2StackProps = {
   sshPubKey: process.env.SSH_PUB_KEY || ' ',
   cpuType: process.env.CPU_TYPE || 'x86_64',
   instanceSize: process.env.INSTANCE_SIZE || 'LARGE',
 };
 
+// log stack props for debug
+console.log(stackProps);
 
 const app = new cdk.App();
 new CloudStack(app, 'CloudStack', {

@@ -11,6 +11,7 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html
 https://aws.amazon.com/cli/
 https://docs.aws.amazon.com/cli/latest/reference/configure/
+https://github.com/aws-samples/aws-cdk-examples/tree/master/typescript/ec2-instance
 ```
 
 *install nvm*

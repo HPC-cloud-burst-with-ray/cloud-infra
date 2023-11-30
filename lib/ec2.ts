@@ -51,6 +51,9 @@ export class EC2NodeResources extends Construct{
     constructor(scope: Construct, id: string, props: ServerProps) {
         super(scope, id);
 
+        // log server props for debug 
+        // console.log(props);
+
         const serverRole = new Role(this, 'serverEc2Role', {
             assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
             inlinePolicies: {
@@ -80,6 +83,7 @@ export class EC2NodeResources extends Construct{
         // determine cpu and instance size
         if (props.cpuType === 'x86_64') {
             cpuType = AmazonLinuxCpuType.X86_64;
+            instanceClass = InstanceClass.M5;
         } else {
             // don't support arm yet, raise error
             throw new Error('Unsupported cpu type');
@@ -115,6 +119,9 @@ export class EC2NodeResources extends Construct{
         }else {
             throw new Error('Unsupported node type');
         }
+
+        // log ssh key for debug
+        // console.log("ssh key: " + props.sshPubKey);
 
         // create instance
         this.instance = new Instance(this, 'Instance', {
