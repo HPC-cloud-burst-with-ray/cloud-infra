@@ -83,7 +83,7 @@ export class OnPremStack extends Stack {
       "fi", 
       "mount -a -t efs,nfs4 defaults",
       "ssh-keygen -t rsa -f /home/ec2-user/.ssh/id_rsa -q -P \"\"",
-      "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa)\" --overwrite"
+      "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite"
     );
 
     // mounting efs on worker node

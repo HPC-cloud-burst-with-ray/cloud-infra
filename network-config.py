@@ -10,7 +10,9 @@ def main(setup_ssh):
         # test_value = ssm.get_parameter(Name='/test/helloworld')
         # print(test_value)
         ssh_pub_cloud01 = ssm.get_parameter(Name='/sshkey/cloud/cloudNode01/id_rsa')
+        print(ssh_pub_cloud01)
         ssh_pub_login = ssm.get_parameter(Name='/sshkey/onprem/loginNode/id_rsa')
+        print(ssh_pub_login)
 
         # TODO: write ssh_pub_cloud01 to authorized_keys file on loginNode
         # TODO: write ssh_pub_login to authorized_keys file on on prem side all worker nodes

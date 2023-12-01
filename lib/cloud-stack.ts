@@ -31,7 +31,7 @@ export class CloudStack extends Stack {
     // add user data commands to the cloud node instance
     cloudNode.instance.userData.addCommands(
       "ssh-keygen -t rsa -f /home/ec2-user/.ssh/id_rsa -q -N ''",
-      "aws ssm put-parameter --name \"/sshkey/cloud/cloudNode01/id_rsa\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa)\" --overwrite"
+      "aws ssm put-parameter --name \"/sshkey/cloud/cloudNode01/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite"
     );
 
     // add putPrarams to the cloud node instance iam policy
