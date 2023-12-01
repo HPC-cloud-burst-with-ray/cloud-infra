@@ -46,6 +46,11 @@ cdk init app --language typescript
 cdk bootstrap
 ```
 
+*python helper scripts setup*
+```
+pip3 install boto3
+```
+
 ## Useful commands
 
 * `npm run build`   compile typescript to js
