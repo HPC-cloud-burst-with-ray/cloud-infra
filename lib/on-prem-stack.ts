@@ -33,7 +33,7 @@ export class OnPremStack extends Stack {
 
     const fileSystem = new efs.FileSystem(this, 'OnPremEfsFileSystem', {
       vpc: onpremVpc.vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: onpremVpc.onPremSecurityGroup,
       encrypted: true,
       lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS,
