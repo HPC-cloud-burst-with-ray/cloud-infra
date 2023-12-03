@@ -30,6 +30,19 @@ export class OnPremStack extends Stack {
     // console.log('account id: ' + Stack.of(this).account);
     // console.log('region: ' + Stack.of(this).region);
 
+    const efsFileSystemPolicy = new iam.PolicyDocument({
+      statements: [new iam.PolicyStatement({
+        actions: ['*'],
+        principals: [new iam.AnyPrincipal()],
+        resources: ['*'],
+        conditions: {
+          Bool: {
+            'elasticfilesystem:AccessedViaMountTarget': 'true',
+          },
+        },
+      })],
+    });
+
 
     const fileSystem = new efs.FileSystem(this, 'OnPremEfsFileSystem', {
       vpc: onpremVpc.vpc,
@@ -38,9 +51,9 @@ export class OnPremStack extends Stack {
       encrypted: true,
       lifecyclePolicy: efs.LifecyclePolicy.AFTER_14_DAYS,
       performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,
-      throughputMode: efs.ThroughputMode.BURSTING
+      throughputMode: efs.ThroughputMode.BURSTING,
+      fileSystemPolicy: efsFileSystemPolicy,
     });
-
 
     // create one login side ec2 instance
     const loginNode = new EC2NodeResources(this, 'OnPremLogin', {
@@ -63,8 +76,8 @@ export class OnPremStack extends Stack {
     });
 
     // allow login node to access worker node
-    fileSystem.connections.allowDefaultPortFrom(loginNode.instance);
-    fileSystem.connections.allowDefaultPortFrom(workerNode.instance);
+    // fileSystem.connections.allowDefaultPortFrom(loginNode.instance);
+    // fileSystem.connections.allowDefaultPortFrom(workerNode.instance);
 
     // give role to login node to do ssm:putParameter
     loginNode.instance.addToRolePolicy(new iam.PolicyStatement({
