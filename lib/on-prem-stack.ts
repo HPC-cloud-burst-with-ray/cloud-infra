@@ -91,7 +91,7 @@ export class OnPremStack extends Stack {
       "yum install -y amazon-efs-utils", 
       "yum install -y nfs-utils", 
       "file_system_id_1=" + fileSystem.fileSystemId, 
-      "efs_mount_point_1=/home/ec2-user", 
+      "efs_mount_point_1=/home/ec2-user/share", 
       "mkdir -p ${efs_mount_point_1}",
       "if test -f \"/sbin/mount.efs\"; then " +
           "echo \"${file_system_id_1}:/ ${efs_mount_point_1} efs defaults,_netdev 0 0\" >> /etc/fstab; " +
@@ -99,9 +99,8 @@ export class OnPremStack extends Stack {
           "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
       "fi", 
       "mount -a -t efs,nfs4 defaults",
-      "chown ec2-user:ec2-user /home/ec2-user",
-      "chmod 777 /home/ec2-user",
       "ssh-keygen -t rsa -f /home/ec2-user/.ssh/id_rsa -q -P \"\"",
+      "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
       "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite"
     );
 
@@ -111,7 +110,7 @@ export class OnPremStack extends Stack {
       "yum install -y amazon-efs-utils", 
       "yum install -y nfs-utils", 
       "file_system_id_1=" + fileSystem.fileSystemId, 
-      "efs_mount_point_1=/home/ec2-user",
+      "efs_mount_point_1=/home/ec2-user/share",
       "mkdir -p ${efs_mount_point_1}",
       "if test -f \"/sbin/mount.efs\"; then " +
           "echo \"${file_system_id_1}:/ ${efs_mount_point_1} efs defaults,_netdev 0 0\" >> /etc/fstab; " +
@@ -119,9 +118,8 @@ export class OnPremStack extends Stack {
           "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
       "fi", 
       "mount -a -t efs,nfs4 defaults",
-      "chown ec2-user:ec2-user /home/ec2-user",
-      "chmod 777 /home/ec2-user",
-      "mkdir -p /home/ec2-user/.ssh"
+      "mkdir -p /home/ec2-user/.ssh",
+      "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/"
     );
 
     // SSM Command to start a session

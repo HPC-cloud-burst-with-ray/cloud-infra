@@ -48,9 +48,11 @@ export class OnPremVpcResources extends Construct {
         // allow HTTPS HTTP and certain ports for ray
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443));
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
-        // allow port range 30000 ~ 31000 for ray and also 6379
-        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(30000, 31000));
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(10000, 65535));
+        // gcs port 6379
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(6379));
+        // add dashboard port 8265
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8265));
         // also allow port 2049 for efs
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
     }
@@ -89,9 +91,11 @@ export class CloudVpcResources extends Construct {
         // allow HTTPS HTTP and certain ports for ray
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443));
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
-        // allow port range 30000 ~ 31000 for ray and also 6379
-        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(30000, 31000));
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(10000, 65535));
+        // gcs port 6379
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(6379));
+        // add dashboard port 8265
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8265));
         // also allow port 2049 for efs
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
     }
