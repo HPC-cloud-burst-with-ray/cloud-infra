@@ -120,12 +120,31 @@ export class OnPremStack extends Stack {
       "else " +
           "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
       "fi", 
-      "mount -a -t efs,nfs4 defaults",
       "ssh-keygen -t rsa -f /home/ec2-user/.ssh/id_rsa -q -P \"\"",
       "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
+      "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite",
+      // Retry loop for the mount operation
+      "max_attempts=5",
+      "attempt=1",
+      "mount_success=0",
+      "while [ $attempt -le $max_attempts ]; do",
+      "   mount -a -t efs,nfs4 defaults",
+      "   if [ $? -eq 0 ]; then",
+      "       echo \"Mount succeeded on attempt $attempt\"",
+      "       mount_success=1",
+      "       break",
+      "   else",
+      "       echo \"Mount attempt $attempt failed, retrying in 5 seconds...\"",
+      "       attempt=$((attempt+1))",
+      "       sleep 5",
+      "   fi",
+      "done",
+      // Check if mount was successful
+      "if [ $mount_success -ne 1 ]; then",
+      "   echo \"Failed to mount EFS after $max_attempts attempts\"",
+      "fi",
       "chown -R ec2-user:ec2-user ${efs_mount_point_1}",
-      "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite"
-    );
+      );
 
     // mounting efs on worker node
     // setup ssh key for worker node
@@ -160,10 +179,29 @@ export class OnPremStack extends Stack {
         "else " +
             "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
         "fi", 
-        "mount -a -t efs,nfs4 defaults",
         "mkdir -p /home/ec2-user/.ssh",
         "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
-        "chown -R ec2-user:ec2-user ${efs_mount_point_1}"
+        // Retry loop for the mount operation
+        "max_attempts=5",
+        "attempt=1",
+        "mount_success=0",
+        "while [ $attempt -le $max_attempts ]; do",
+        "   mount -a -t efs,nfs4 defaults",
+        "   if [ $? -eq 0 ]; then",
+        "       echo \"Mount succeeded on attempt $attempt\"",
+        "       mount_success=1",
+        "       break",
+        "   else",
+        "       echo \"Mount attempt $attempt failed, retrying in 5 seconds...\"",
+        "       attempt=$((attempt+1))",
+        "       sleep 5",
+        "   fi",
+        "done",
+        // Check if mount was successful
+        "if [ $mount_success -ne 1 ]; then",
+        "   echo \"Failed to mount EFS after $max_attempts attempts\"",
+        "fi",
+        "chown -R ec2-user:ec2-user ${efs_mount_point_1}",
       );
     }
 
