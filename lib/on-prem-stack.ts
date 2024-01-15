@@ -6,13 +6,12 @@ import { OnPremVpcResources } from './vpc';
 import { EC2NodeResources } from './ec2';
 import { EC2StackProps } from './utils';
 import * as efs from 'aws-cdk-lib/aws-efs';
-import { on } from 'events';
 
 export class OnPremStack extends Stack {
   constructor(scope: Construct, id: string, props: EC2StackProps) {
     super(scope, id, props);
 
-    const { sshPubKey, cpuType, instanceSize } = props;
+    const { sshPubKey, cpuType, instanceSize, workerNodeNum } = props;
     // assert cpuType is x86_64
     if (cpuType !== 'x86_64') {
       throw new Error('cpuType must be x86_64');
@@ -65,15 +64,38 @@ export class OnPremStack extends Stack {
       nodeType: 'ONPREM_LOGIN',
     });
 
+    // generate node id string with two digits
+    const getNodeId = (id: number) => {
+      if (id < 10) {
+        return '0' + id;
+      } else {
+        return id;
+      }
+    };
+
+    // create workerNodeNum worker nodes
+    let workerNodesArray = [];
+    for (let i = 0; i < workerNodeNum; i++) {
+      const workerNode = new EC2NodeResources(this, 'OnPremWorker' + getNodeId(i), {
+        vpc: onpremVpc.vpc,
+        securityGroup: onpremVpc.onPremSecurityGroup,
+        sshPubKey: sshPubKey,
+        cpuType: cpuType,
+        instanceSize: instanceSize,
+        nodeType: 'ONPREM_WORKER',
+      });
+      workerNodesArray.push(workerNode);
+    }
+
     // only add one worker node for now
-    const workerNode = new EC2NodeResources(this, 'OnPremWorker01', {
-      vpc: onpremVpc.vpc,
-      securityGroup: onpremVpc.onPremSecurityGroup,
-      sshPubKey: sshPubKey,
-      cpuType: cpuType,
-      instanceSize: instanceSize,
-      nodeType: 'ONPREM_WORKER',
-    });
+    // const workerNode = new EC2NodeResources(this, 'OnPremWorker01', {
+    //   vpc: onpremVpc.vpc,
+    //   securityGroup: onpremVpc.onPremSecurityGroup,
+    //   sshPubKey: sshPubKey,
+    //   cpuType: cpuType,
+    //   instanceSize: instanceSize,
+    //   nodeType: 'ONPREM_WORKER',
+    // });
 
     // allow login node to access worker node
     // fileSystem.connections.allowDefaultPortFrom(loginNode.instance);
@@ -101,26 +123,49 @@ export class OnPremStack extends Stack {
       "mount -a -t efs,nfs4 defaults",
       "ssh-keygen -t rsa -f /home/ec2-user/.ssh/id_rsa -q -P \"\"",
       "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
+      "chown -R ec2-user:ec2-user ${efs_mount_point_1}",
       "aws ssm put-parameter --name \"/sshkey/onprem/loginNode/id_rsa_pub\" --type \"String\" --value \"$(cat /home/ec2-user/.ssh/id_rsa.pub)\" --overwrite"
     );
 
     // mounting efs on worker node
     // setup ssh key for worker node
-    workerNode.instance.userData.addCommands(
-      "yum install -y amazon-efs-utils", 
-      "yum install -y nfs-utils", 
-      "file_system_id_1=" + fileSystem.fileSystemId, 
-      "efs_mount_point_1=/home/ec2-user/share",
-      "mkdir -p ${efs_mount_point_1}",
-      "if test -f \"/sbin/mount.efs\"; then " +
-          "echo \"${file_system_id_1}:/ ${efs_mount_point_1} efs defaults,_netdev 0 0\" >> /etc/fstab; " +
-      "else " +
-          "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
-      "fi", 
-      "mount -a -t efs,nfs4 defaults",
-      "mkdir -p /home/ec2-user/.ssh",
-      "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/"
-    );
+
+    // single worker node case
+    // workerNode.instance.userData.addCommands(
+    //   "yum install -y amazon-efs-utils", 
+    //   "yum install -y nfs-utils", 
+    //   "file_system_id_1=" + fileSystem.fileSystemId, 
+    //   "efs_mount_point_1=/home/ec2-user/share",
+    //   "mkdir -p ${efs_mount_point_1}",
+    //   "if test -f \"/sbin/mount.efs\"; then " +
+    //       "echo \"${file_system_id_1}:/ ${efs_mount_point_1} efs defaults,_netdev 0 0\" >> /etc/fstab; " +
+    //   "else " +
+    //       "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
+    //   "fi", 
+    //   "mount -a -t efs,nfs4 defaults",
+    //   "mkdir -p /home/ec2-user/.ssh",
+    //   "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
+    //   "chown -R ec2-user:ec2-user ${efs_mount_point_1}"
+    // );
+
+    for (let i = 0; i < workerNodeNum; i++) {
+      workerNodesArray[i].instance.userData.addCommands(
+        "yum install -y amazon-efs-utils", 
+        "yum install -y nfs-utils", 
+        "file_system_id_1=" + fileSystem.fileSystemId, 
+        "efs_mount_point_1=/home/ec2-user/share",
+        "mkdir -p ${efs_mount_point_1}",
+        "if test -f \"/sbin/mount.efs\"; then " +
+            "echo \"${file_system_id_1}:/ ${efs_mount_point_1} efs defaults,_netdev 0 0\" >> /etc/fstab; " +
+        "else " +
+            "echo \"${file_system_id_1}.efs." + Stack.of(this).region + ".amazonaws.com:/ ${efs_mount_point_1} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0\" >> /etc/fstab; " +
+        "fi", 
+        "mount -a -t efs,nfs4 defaults",
+        "mkdir -p /home/ec2-user/.ssh",
+        "chown -R ec2-user:ec2-user /home/ec2-user/.ssh/",
+        "chown -R ec2-user:ec2-user ${efs_mount_point_1}"
+      );
+    }
 
     // SSM Command to start a session
     new CfnOutput(this, 'ssmCommand', {
