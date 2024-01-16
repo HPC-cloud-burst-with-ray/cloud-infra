@@ -9,6 +9,9 @@ import time
 # pip3 install ray[client]
 # pip3 install ray[default]
 
+config_env_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+config_env_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+
 def get_ec2_info_from_stack(stack_name):
     cloudformation = boto3.client('cloudformation')
     ec2_client = boto3.client('ec2')
@@ -49,6 +52,23 @@ def run_commands_ssh(node_ip, user_name, commands):
         print("SSH into node: " + node_ip + " failed")
         print(e)
     ssh.close()
+
+def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, commands):
+    # ssh into login node, login node will ssh into other nodes and run commands
+    ssh = paramiko.SSHClient()
+    try:
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(hostname=login_ip, username=login_user_name)
+        print("SSH into login node: " + login_ip + " successfully")
+        for command in commands:
+            # execute commands on user_name@node_ip
+            stdin, stdout, stderr = ssh.exec_command(f"ssh -o StrictHostKeyChecking=no {user_name}@{node_ip} \"{command}\" ")
+            print(stdout.read())
+            print(stderr.read())
+    except Exception as e:
+        print("SSH into login node: " + login_ip + " failed")
+        print(e)
+
 
 def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
     key_str = "\n".join(ssh_keys_to_add)
@@ -99,7 +119,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
         print("Adding ssh key to on prem node: " + instance_id + " failed")
         print(e)
 
-def setup_ssh_authorized_keys(cluster_info, extra_ssh_keys_list):
+def setup_env(cluster_info, extra_ssh_keys_list):
     ssm = boto3.client('ssm')
     # get login node, on prem worker nodes, and cloud worker nodes
     login_node = None
@@ -138,14 +158,21 @@ def setup_ssh_authorized_keys(cluster_info, extra_ssh_keys_list):
         add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
     for node in onprem_worker_nodes:
         add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
-
-    
+    # configure sshuttle on cloud node
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", config_env_onprem_nodes)
+    for node in cloud_worker_nodes:
+        run_commands_ssh(node["PublicIp"], "ec2-user", config_env_cloud_nodes)
+    # configure ray environment for all nodes
+    for node in onprem_worker_nodes:
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_env_onprem_nodes)
 
 
 @click.command()
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
-def main(cluster_config, extra_ssh_keys):
+@click.option('--run-sshuttle', is_flag=False, help='configure sshuttle')
+@click.option('--run-ray', is_flag=False, help='configure sshuttle and run ray commands')
+def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -184,8 +211,13 @@ def main(cluster_config, extra_ssh_keys):
             for obj in extra_ssh_keys_kv:
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
-    setup_ssh_authorized_keys(cluster_info, extra_ssh_keys_list)
-
+    setup_env(cluster_info, extra_ssh_keys_list)
+    if run_ray:
+        run_sshuttle = True
+    if run_sshuttle:
+        print("Running sshuttle on all cloud nodes and tunnel to on prem nodes")
+    if run_ray:
+        print("Running ray commands on all nodes")
 
 if __name__ == '__main__':
     main()
