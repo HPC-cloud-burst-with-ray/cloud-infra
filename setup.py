@@ -166,12 +166,40 @@ def setup_env(cluster_info, extra_ssh_keys_list):
     for node in onprem_worker_nodes:
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_env_onprem_nodes)
 
+def convert_commands_to_tmux_commands(commands):
+    tmux_commands = []
+    for command in commands:
+        tmux_commands.append(f"tmux new -d -s '{command}' ")
+    return tmux_commands
+
+def setup_sshuttle_processes(cluster_info):
+    # sshuttle --daemon --dns -NHr ec2-user@login_node_ip <worker nodes>
+    onprem_nodes_ips = []
+    login_node = None
+    for node in cluster_info["OnPremNodesInfo"]:
+        onprem_nodes_ips.append(node["PrivateIp"])
+        if node["LoginNode"]:
+            login_node = node
+    onprem_nodes_ips_str = " ".join(onprem_nodes_ips)
+    cloud_nodes_ips = []
+    for node in cluster_info["CloudNodesInfo"]:
+        cloud_nodes_ips.append(node["PublicIp"])
+    login_node_ip = login_node["PublicIp"]
+    sshuttle_command = f"sshuttle --dns -NHr ec2-user@{login_node_ip} {onprem_nodes_ips_str}"
+    sshuttle_tmux_commands = convert_commands_to_tmux_commands([sshuttle_command])
+    for node_ip in cloud_nodes_ips:
+        print("Running sshuttle command: " + sshuttle_tmux_commands[0])
+        run_commands_ssh(node_ip, "ec2-user", sshuttle_tmux_commands)
+
+def setup_ray_processes(cluster_info):
+    pass
+
 
 @click.command()
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
-@click.option('--run-sshuttle', is_flag=False, help='configure sshuttle')
-@click.option('--run-ray', is_flag=False, help='configure sshuttle and run ray commands')
+@click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
+@click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
 def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
@@ -212,12 +240,15 @@ def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
     setup_env(cluster_info, extra_ssh_keys_list)
+    # open up long running processes
     if run_ray:
         run_sshuttle = True
     if run_sshuttle:
         print("Running sshuttle on all cloud nodes and tunnel to on prem nodes")
+        setup_sshuttle_processes(cluster_info)
     if run_ray:
         print("Running ray commands on all nodes")
+        setup_ray_processes(cluster_info)
 
 if __name__ == '__main__':
     main()
