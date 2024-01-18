@@ -167,7 +167,7 @@ def setup_env(cluster_info, extra_ssh_keys_list):
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_env_onprem_nodes)
 
 def convert_command_to_tmux_command(session_name, command):
-    return f"tmux new -d -s {session_name} '{command}' "
+    return f"tmux new -d -s {session_name} \"{command}\" "
 
 def setup_sshuttle_processes(cluster_info):
     # sshuttle --daemon --dns -NHr ec2-user@login_node_ip <worker nodes>
@@ -182,7 +182,7 @@ def setup_sshuttle_processes(cluster_info):
     for node in cluster_info["CloudNodesInfo"]:
         cloud_nodes_ips.append(node["PublicIp"])
     login_node_ip = login_node["PublicIp"]
-    sshuttle_command = f"sshuttle --dns -NHr ec2-user@{login_node_ip} {onprem_nodes_ips_str}"
+    sshuttle_command = f"sshuttle --ssh-cmd 'ssh -o StrictHostKeyChecking=no' --dns -NHr ec2-user@{login_node_ip} {onprem_nodes_ips_str}"
     session_name = "sshuttle_session"
     sshuttle_tmux_command = convert_command_to_tmux_command(session_name, sshuttle_command)
     sshuttle_tmux_commands = [f"tmux kill-session -t {session_name}", sshuttle_tmux_command]
