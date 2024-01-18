@@ -191,8 +191,61 @@ def setup_sshuttle_processes(cluster_info):
         run_commands_ssh(node_ip, "ec2-user", sshuttle_tmux_commands)
 
 def setup_ray_processes(cluster_info):
-    pass
-
+    onprem_nodes = cluster_info["OnPremNodesInfo"]
+    onprem_worker_nodes = []
+    login_node = None
+    cloud_nodes = cluster_info["CloudNodesInfo"]
+    for node in onprem_nodes:
+        if not node["LoginNode"]:
+            onprem_worker_nodes.append(node)
+        else:
+            login_node = node
+    login_node_private_ip = login_node["PrivateIp"]
+    login_node_public_ip = login_node["PublicIp"]
+    gcs_port = 6379
+    dashboard_port = 8265
+    client_server_port = 10001
+    min_worker_port = 30010
+    max_worker_port = 30050
+    num_cpus = 2
+    num_gpus = 0
+    node_manager_port = 30008
+    object_manager_port = 30009
+    redis_password = "12345678"
+    ray_command_head = f"ray start --head --node-ip-address={login_node_private_ip} --port={gcs_port} --dashboard-port={dashboard_port} --num-cpus {num_cpus} --num-gpus {num_gpus} --ray-client-server-port {client_server_port} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+    head_address = f"{login_node_private_ip}:{gcs_port}"
+    ray_onprem_worker_commands = []
+    for i in range(len(onprem_worker_nodes)):
+        node = onprem_worker_nodes[i]
+        node_ip = node["PrivateIp"]
+        ray_onprem_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpus} --num-gpus {num_gpus} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        ray_onprem_worker_commands.append(ray_onprem_worker_command)
+    ray_cloud_worker_commands = []
+    for i in range(len(cloud_nodes)):
+        node = cloud_nodes[i]
+        node_ip = node["PublicIp"]
+        ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpus} --num-gpus {num_gpus} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        ray_cloud_worker_commands.append(ray_cloud_worker_command)
+    # start to close all previous ray processes
+    ray_session_name = "ray_session"
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
+    for node in onprem_worker_nodes:
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", ["ray stop"])
+    for node in cloud_nodes:
+        run_commands_ssh(node["PublicIp"], "ec2-user", ["ray stop"])
+    # start new ray processes
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", [ray_command_head])
+    for i in range(len(onprem_worker_nodes)):
+        node = onprem_worker_nodes[i]
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", [ray_onprem_worker_commands[i]])
+    for i in range(len(cloud_nodes)):
+        node = cloud_nodes[i]
+        run_commands_ssh(node["PublicIp"], "ec2-user", [ray_cloud_worker_commands[i]])
+    # finishing setting up ray processes
+    print("Ray processes are set up")
+    print("Suggestion: Use VSCode remote ssh to get into login node and open up live server to view ray dashboard: http://localhost:8265")
+    print("Suggestion: You can also use reverse tunnel to do this with the command below: ")
+    print(f"ssh -L 8265:localhost:8265 ec2-user@{login_node_public_ip}")
 
 @click.command()
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
