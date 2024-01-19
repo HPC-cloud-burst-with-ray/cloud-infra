@@ -52,7 +52,8 @@ new CloudStack(app, 'CloudStack', {
   /* Uncomment the next line to specialize this stack for the AWS Account
    * and Region that are implied by the current CLI configuration. */
   // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-  env: { account: '221930534130', region: 'us-east-1' },
+  // env: { account: '221930534130', region: 'us-east-1' },
+  env: { account: deployAccountConfig, region: deployRegionConfig },
 
   /* Uncomment the next line if you know exactly what Account and Region you
    * want to deploy the stack to. */
@@ -64,7 +65,8 @@ new CloudStack(app, 'CloudStack', {
 
 new OnPremStack(app, 'OnPremStack', {
   // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-  env: { account: '221930534130', region: 'us-east-1' },
+  // env: { account: '221930534130', region: 'us-east-1' },
+  env: { account: deployAccountConfig, region: deployRegionConfig },
 
   ...stackPropsOnPrem
 });
