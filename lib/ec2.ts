@@ -77,7 +77,8 @@ export class EC2NodeResources extends Construct{
         // Add user data that is used to configure the EC2 instance
         userData.addCommands(
             'yum update -y',
-            'yum install -y amazon-cloudwatch-agent nodejs python3-pip iptables nftables zip unzip git vim tmux',
+            'yum install -y amazon-cloudwatch-agent nodejs python3-pip iptables nftables zip unzip git vim tmux python3-devel',
+            'ln -s /usr/bin/python3 /usr/bin/python',
         );
     
         // determine cpu and instance size

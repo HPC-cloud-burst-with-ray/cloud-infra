@@ -7,12 +7,12 @@
     },
 
     "cloud": {
-        "WORKER_NODE_NUM": 2,
+        "WORKER_NODE_NUM": 1,
         "INSTANCE_SIZE": "LARGE"
     },
 
     "onprem": {
-        "WORKER_NODE_NUM": 2,
+        "WORKER_NODE_NUM": 1,
         "INSTANCE_SIZE": "LARGE"
     }
   }
