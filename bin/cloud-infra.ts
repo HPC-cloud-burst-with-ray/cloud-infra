@@ -3,6 +3,7 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { CloudStack } from '../lib/cloud-stack';
 import { OnPremStack } from '../lib/on-prem-stack';
+import { DevStack } from '../lib/dev-stack';
 import { EC2StackProps } from '../lib/utils';
 import * as fs from 'fs';
 
@@ -29,8 +30,16 @@ const stackPropsCloud: EC2StackProps = {
   instanceSize: appConfig.cloud.INSTANCE_SIZE || 'LARGE',
   workerNodeNum: appConfig.cloud.WORKER_NODE_NUM || 1,
 };
-
 console.log("Cloud StackProps: ", stackPropsCloud);
+
+const stackPropsDev: EC2StackProps = {
+  sshPubKey: appConfig.environment.SSH_PUB_KEY || ' ',
+  cpuType: appConfig.environment.CPU_TYPE || 'x86_64',
+  instanceSize: appConfig.dev.INSTANCE_SIZE || 'XLARGE',
+  workerNodeNum: 1
+};
+console.log("Dev StackProps: ", stackPropsDev);
+
 
 // require('dotenv').config();
 // const stackProps: EC2StackProps = {
@@ -69,6 +78,14 @@ new OnPremStack(app, 'OnPremStack', {
   env: { account: deployAccountConfig, region: deployRegionConfig },
 
   ...stackPropsOnPrem
+});
+
+new DevStack(app, 'DevStack', {
+  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+  // env: { account: '221930534130', region: 'us-east-1' },
+  env: { account: deployAccountConfig, region: deployRegionConfig },
+
+  ...stackPropsDev
 });
 
 app.synth();

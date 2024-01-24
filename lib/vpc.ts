@@ -100,3 +100,38 @@ export class CloudVpcResources extends Construct {
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
     }
 }
+
+export class DevVpcResources extends Construct {
+    public devSecurityGroup: SecurityGroup;
+    public vpc: Vpc;
+  
+    constructor(scope: Construct, id: string) {
+        super(scope, id);
+  
+        // Create a VPC with public subnets in 1 AZ
+        this.vpc = new Vpc(this, 'DevVPC', {
+            natGateways: 0,
+            subnetConfiguration: [
+            {
+                cidrMask: 24,
+                name: 'ServerPublic',
+                subnetType: SubnetType.PUBLIC,
+                mapPublicIpOnLaunch: true,
+            },
+            ],
+            maxAzs: 1,
+        });
+  
+        // Create a security group for SSH
+        this.devSecurityGroup = new SecurityGroup(this, 'DevSecurityGroup', {
+            vpc: this.vpc,
+            description: 'Security Group for SSH/HTTP/HTTPS/NFS',
+            allowAllOutbound: true,
+        });
+
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(22));
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443));
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
+    }
+}

@@ -15,7 +15,11 @@ config_env_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3
 def get_ec2_info_from_stack(stack_name):
     cloudformation = boto3.client('cloudformation')
     ec2_client = boto3.client('ec2')
-    response = cloudformation.describe_stack_resources(StackName=stack_name)
+    try:
+        response = cloudformation.describe_stack_resources(StackName=stack_name)
+    except Exception as e:
+        print("Stack: " + stack_name + " does not exist")
+        return None
     resource_ids = []
     for resource in response['StackResources']:
         if resource['ResourceType'] == 'AWS::EC2::Instance':
@@ -71,7 +75,6 @@ def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, co
 
 
 def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
-    key_str = "\n".join(ssh_keys_to_add)
     ssm = boto3.client('ssm')
     try:
         # avoid adding duplicate ssh keys, also execute under ec2-user
@@ -89,7 +92,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
             )
             command_id = response['Command']['CommandId']
             # wait for command to finish
-            time.sleep(2)
+            time.sleep(3)
             # get command output
             response = ssm.get_command_invocation(
                 CommandId=command_id,
@@ -105,7 +108,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
                 )
                 command_id = response['Command']['CommandId']
                 # wait for command to finish
-                time.sleep(2)
+                time.sleep(3)
                 # get command output
                 response = ssm.get_command_invocation(
                     CommandId=command_id,
@@ -115,6 +118,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
                     print("Adding ssh key: " + ssh_keys_to_add[i] + " to authorized_keys")
                 else:
                     print("Adding ssh key: " + ssh_keys_to_add[i] + " to authorized_keys failed")
+                # print(response)
     except Exception as e:
         print("Adding ssh key to on prem node: " + instance_id + " failed")
         print(e)
@@ -165,6 +169,21 @@ def setup_env(cluster_info, extra_ssh_keys_list):
     # configure ray environment for all nodes
     for node in onprem_worker_nodes:
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_env_onprem_nodes)
+    # add ssh keys in extra_ssh_keys_list to dev node if it exists
+    # don't install ray on dev nodes because we want to build from source code
+    if "DevNodesInfo" in cluster_info:
+        print("DevNodesInfo found in cluster_info, adding extra ssh keys to dev nodes")
+        dev_nodes = cluster_info["DevNodesInfo"]
+        assert len(dev_nodes) > 0
+        for node in dev_nodes:
+            add_authorized_keys_ssm(node["InstanceId"], extra_ssh_keys_list)
+    else:
+        print("No DevNodesInfo found in cluster_info")
+
+def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
+    # will use the wheel file to overwrite the default installed ray
+    pass
+        
 
 def convert_command_to_tmux_command(session_name, command):
     return f"tmux new -d -s {session_name} \"{command}\" "
@@ -227,7 +246,6 @@ def setup_ray_processes(cluster_info):
         ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpus} --num-gpus {num_gpus} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
         ray_cloud_worker_commands.append(ray_cloud_worker_command)
     # start to close all previous ray processes
-    ray_session_name = "ray_session"
     run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
     for node in onprem_worker_nodes:
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", ["ray stop"])
@@ -250,9 +268,10 @@ def setup_ray_processes(cluster_info):
 @click.command()
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
+@click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI')
 @click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
-def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
+def main(cluster_config, extra_ssh_keys, custom_ray_wheel, run_sshuttle, run_ray):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -261,7 +280,7 @@ def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
     # fill in cluster_info
     cluster_info = {}
     cluster_info["NumCloudNodes"] = ray_config["cloud"]["WORKER_NODE_NUM"]
-    cluster_info["NumOnPremNodes"] = ray_config["onprem"]["WORKER_NODE_NUM"]
+    cluster_info["NumOnPremNodes"] = ray_config["onprem"]["WORKER_NODE_NUM"] + 1 # add login node itself
     cluster_info["OnPremNodesInfo"] = None
     cluster_info["CloudNodesInfo"] = None
     # fetch node names from cloud formation stack OnPremStack and CloudStack
@@ -279,6 +298,12 @@ def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
     cluster_info["CloudNodesInfo"] = cloud_ec2_info
     print("Cloud Stack Cluster Info: ")
     print(cloud_ec2_info)
+    # try to find dev stack
+    dev_ec2_info = get_ec2_info_from_stack("DevStack")
+    if dev_ec2_info is not None:
+        cluster_info["DevNodesInfo"] = dev_ec2_info
+        print("Dev Stack Cluster Info: ")
+        print(dev_ec2_info)
     # dump cluster_info to file for users to review
     with open('cluster.out.json', 'w') as outfile:
         json.dump(cluster_info, outfile)
@@ -292,6 +317,9 @@ def main(cluster_config, extra_ssh_keys, run_sshuttle, run_ray):
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
     setup_env(cluster_info, extra_ssh_keys_list)
+    if custom_ray_wheel != "":
+        print('Setting up custom ray wheel from URL: ' + custom_ray_wheel)
+        setup_custom_ray_wheel(cluster_info, custom_ray_wheel)
     # open up long running processes
     if run_ray:
         run_sshuttle = True

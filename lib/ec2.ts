@@ -91,16 +91,16 @@ export class EC2NodeResources extends Construct{
         }
         
         switch (props.instanceSize) {
-            case 'large':
+            case 'LARGE':
               instanceSize = InstanceSize.LARGE;
               break;
-            case 'xlarge':
+            case 'XLARGE':
               instanceSize = InstanceSize.XLARGE;
               break;
-            case 'xlarge2':
+            case 'XLARGE2':
               instanceSize = InstanceSize.XLARGE2;
               break;
-            case 'xlarge4':
+            case 'XLARGE4':
               instanceSize = InstanceSize.XLARGE4;
               break;
             default:

@@ -6,6 +6,10 @@
         "CDK_DEPLOY_REGION": "us-east-1"
     },
 
+    "dev": {
+        "INSTANCE_SIZE": "XLARGE"
+    },
+
     "cloud": {
         "WORKER_NODE_NUM": 1,
         "INSTANCE_SIZE": "LARGE"
