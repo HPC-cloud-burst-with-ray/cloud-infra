@@ -55,6 +55,7 @@ export class OnPremVpcResources extends Construct {
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8265));
         // also allow port 2049 for efs
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
     }
 }
 
@@ -98,6 +99,8 @@ export class CloudVpcResources extends Construct {
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8265));
         // also allow port 2049 for efs
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
+        // add 8888 for jupyter and file transfer
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
     }
 }
 
@@ -133,5 +136,6 @@ export class DevVpcResources extends Construct {
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443));
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
     }
 }

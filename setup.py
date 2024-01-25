@@ -182,8 +182,39 @@ def setup_env(cluster_info, extra_ssh_keys_list):
 
 def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
     # will use the wheel file to overwrite the default installed ray
-    pass
-        
+    # example custom_ray_wheel: http://34.207.251.137:8888/ray.whl
+    filename = custom_ray_wheel.split('/')[-1]
+    curl_command = f"curl -o {filename} {custom_ray_wheel}"
+    login_node = None
+    cloud_worker_nodes = []
+    onprem_worker_nodes = []
+    for node in cluster_info["OnPremNodesInfo"]:
+        if node["LoginNode"]:
+            login_node = node
+        else:
+            onprem_worker_nodes.append(node)
+    cloud_worker_nodes = cluster_info["CloudNodesInfo"]
+    # login node cd into ~/share, curl to download, let NFS share to other nodes
+    login_node_ip = login_node["PublicIp"]
+    login_node_user = "ec2-user"
+    login_node_share_dir = "~/share"
+    run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && {curl_command}"])
+    # first cloud node curl to ~/share, then let NFS share to other nodes
+    cloud_node = cloud_worker_nodes[0]
+    cloud_node_ip = cloud_node["PublicIp"]
+    cloud_node_user = "ec2-user"
+    cloud_node_share_dir = "~/share"
+    run_commands_ssh(cloud_node_ip, cloud_node_user, [f"cd {cloud_node_share_dir} && {curl_command}"])
+    # give some time for NFS to sync
+    time.sleep(15)
+    # overwrite ray wheel on all nodes
+    # force_reinstall_flag = "--force-reinstall"
+    force_reinstall_flag = " "
+    run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    for node in onprem_worker_nodes:
+        run_commands_ssh_via_login(login_node_ip, login_node_user, node["PrivateIp"], "ec2-user", [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    for node in cloud_worker_nodes:
+        run_commands_ssh(node["PublicIp"], "ec2-user", [f"cd {cloud_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
 
 def convert_command_to_tmux_command(session_name, command):
     return f"tmux new -d -s {session_name} \"{command}\" "
