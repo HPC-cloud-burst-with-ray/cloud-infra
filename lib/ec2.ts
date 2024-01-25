@@ -131,6 +131,17 @@ export class EC2NodeResources extends Construct{
             associatePublicIpAddress: associatePublicIpAddress,
             securityGroup: props.securityGroup,
             instanceType: InstanceType.of(instanceClass, instanceSize),
+            // gives more disk space
+            blockDevices: [
+                {
+                    deviceName: '/dev/xvda',
+                    volume: {
+                        ebsDevice: {
+                            volumeSize: 15,
+                        },
+                    },
+                },
+            ],
             machineImage: MachineImage.latestAmazonLinux2023({
             cachedInContext: false,
             cpuType: cpuType,
