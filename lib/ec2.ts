@@ -79,6 +79,7 @@ export class EC2NodeResources extends Construct{
             'yum update -y',
             'yum install -y amazon-cloudwatch-agent nodejs python3-pip iptables nftables zip unzip git vim tmux python3-devel',
             'ln -s /usr/bin/python3 /usr/bin/python',
+            'yum install -y java-1.8.0-amazon-corretto-devel'
         );
     
         // determine cpu and instance size

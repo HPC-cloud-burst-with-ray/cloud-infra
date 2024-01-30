@@ -9,8 +9,19 @@ import time
 # pip3 install ray[client]
 # pip3 install ray[default]
 
-config_env_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
-config_env_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+config_watchman_amz_linux_commands = [
+    "cd ~ && [ ! -d 'watchman-amazonlinux-problems' ] && git clone https://github.com/marc-guenther/watchman-amazonlinux-problems.git",
+    "cd ~/watchman-amazonlinux-problems/watchman && chmod 755 watchman* && sudo mkdir -p /usr/local/bin && sudo cp ./* /usr/local/bin",
+]
+
+config_mirror_commands = [
+    "wget https://github.com/stephenh/mirror/releases/latest/download/mirror-all.jar -O ~/mirror-all.jar",
+    "wget https://github.com/stephenh/mirror/releases/latest/download/mirror -O ~/mirror",
+    "cd ~/ && sudo chmod u+x mirror",
+]
+
+config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
 def get_ec2_info_from_stack(stack_name):
     cloudformation = boto3.client('cloudformation')
@@ -163,12 +174,14 @@ def setup_env(cluster_info, extra_ssh_keys_list):
     for node in onprem_worker_nodes:
         add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
     # configure sshuttle on cloud node
-    run_commands_ssh(login_node["PublicIp"], "ec2-user", config_env_onprem_nodes)
+    config_commands_onprem = config_rayenv_onprem_nodes + config_watchman_amz_linux_commands + config_mirror_commands
+    config_commands_cloud = config_rayenv_cloud_nodes + config_watchman_amz_linux_commands + config_mirror_commands
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", config_commands_onprem)
     for node in cloud_worker_nodes:
-        run_commands_ssh(node["PublicIp"], "ec2-user", config_env_cloud_nodes)
+        run_commands_ssh(node["PublicIp"], "ec2-user", config_commands_cloud)
     # configure ray environment for all nodes
     for node in onprem_worker_nodes:
-        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_env_onprem_nodes)
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_commands_onprem)
     # add ssh keys in extra_ssh_keys_list to dev node if it exists
     # don't install ray on dev nodes because we want to build from source code
     if "DevNodesInfo" in cluster_info:
@@ -291,7 +304,15 @@ def setup_ray_processes(cluster_info):
         node = cloud_nodes[i]
         run_commands_ssh(node["PublicIp"], "ec2-user", [ray_cloud_worker_commands[i]])
     # finishing setting up ray processes
-    print("Ray processes are set up")
+    print("Ray processes are set up, setting up unified distributed file system through mirror")
+    # setup mirror process
+    login_node_share_dir = "~/share"
+    cloud_node_share_dir = "~/share"
+    mirror_server_command = "cd ~ && ./mirror server --skip-limit-checks"
+    mirror_client_command = f"cd ~ && ./mirror client -h {login_node_private_ip} -l {login_node_share_dir} -r {cloud_node_share_dir} --skip-limit-checks"
+    mirror_tmux_session_name = "mirror_session"
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_server_command)])
+    run_commands_ssh(cloud_nodes[0]["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_client_command)])
     print("Suggestion: Use VSCode remote ssh to get into login node and open up live server to view ray dashboard: http://localhost:8265")
     print("Suggestion: You can also use reverse tunnel to do this with the command below: ")
     print(f"ssh -L 8265:localhost:8265 ec2-user@{login_node_public_ip}")
