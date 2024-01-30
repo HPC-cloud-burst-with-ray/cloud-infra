@@ -23,6 +23,10 @@ config_mirror_commands = [
 config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
+remove_existing_ray_commands = ["pip3 uninstall -y ray"]
+
+shutdown_all_processes_commands = ["ray stop", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
+
 def get_ec2_info_from_stack(stack_name):
     cloudformation = boto3.client('cloudformation')
     ec2_client = boto3.client('ec2')
@@ -134,7 +138,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
         print("Adding ssh key to on prem node: " + instance_id + " failed")
         print(e)
 
-def setup_env(cluster_info, extra_ssh_keys_list):
+def setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray):
     ssm = boto3.client('ssm')
     # get login node, on prem worker nodes, and cloud worker nodes
     login_node = None
@@ -173,9 +177,12 @@ def setup_env(cluster_info, extra_ssh_keys_list):
         add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
     for node in onprem_worker_nodes:
         add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
-    # configure sshuttle on cloud node
+    # configure sshuttle on cloud node 
     config_commands_onprem = config_rayenv_onprem_nodes + config_watchman_amz_linux_commands + config_mirror_commands
     config_commands_cloud = config_rayenv_cloud_nodes + config_watchman_amz_linux_commands + config_mirror_commands
+    if remove_existing_ray:
+        config_commands_onprem = remove_existing_ray_commands + config_commands_onprem
+        config_commands_cloud = remove_existing_ray_commands + config_commands_cloud
     run_commands_ssh(login_node["PublicIp"], "ec2-user", config_commands_onprem)
     for node in cloud_worker_nodes:
         run_commands_ssh(node["PublicIp"], "ec2-user", config_commands_cloud)
@@ -320,16 +327,22 @@ def setup_ray_processes(cluster_info):
 @click.command()
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
+@click.option('--remove-existing-ray', is_flag=True, default=False, help='remove existing ray installation')
 @click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI')
 @click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
-def main(cluster_config, extra_ssh_keys, custom_ray_wheel, run_sshuttle, run_ray):
+@click.option('--shutdown', is_flag=True, default=False, help='shutdown all nodes ray processes and networking processes')
+def main(cluster_config, extra_ssh_keys, remove_existing_ray, custom_ray_wheel, run_sshuttle, run_ray, shutdown):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
         ray_config = json.load(f)
         # print(ray_config)
     # fill in cluster_info
+    if shutdown:
+        print("Shutting down all nodes ray processes and networking processes, disable run-sshuttle and run-ray flags")
+        run_sshuttle = False
+        run_ray = False
     cluster_info = {}
     cluster_info["NumCloudNodes"] = ray_config["cloud"]["WORKER_NODE_NUM"]
     cluster_info["NumOnPremNodes"] = ray_config["onprem"]["WORKER_NODE_NUM"] + 1 # add login node itself
@@ -338,10 +351,12 @@ def main(cluster_config, extra_ssh_keys, custom_ray_wheel, run_sshuttle, run_ray
     # fetch node names from cloud formation stack OnPremStack and CloudStack
     on_prem_ec2_info = get_ec2_info_from_stack("OnPremStack")
     cluster_info["OnPremNodesInfo"] = on_prem_ec2_info
+    login_node = None
     # filter for login node who has public ip
     for node in on_prem_ec2_info:
         if node["PublicIp"] != "":
             node["LoginNode"] = True
+            login_node = node
         else:
             node["LoginNode"] = False
     print("On Prem Stack Cluster Info: ")
@@ -368,7 +383,7 @@ def main(cluster_config, extra_ssh_keys, custom_ray_wheel, run_sshuttle, run_ray
             for obj in extra_ssh_keys_kv:
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
-    setup_env(cluster_info, extra_ssh_keys_list)
+    setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray)
     if custom_ray_wheel != "":
         print('Setting up custom ray wheel from URL: ' + custom_ray_wheel)
         setup_custom_ray_wheel(cluster_info, custom_ray_wheel)
@@ -381,6 +396,16 @@ def main(cluster_config, extra_ssh_keys, custom_ray_wheel, run_sshuttle, run_ray
     if run_ray:
         print("Running ray commands on all nodes")
         setup_ray_processes(cluster_info)
+    if shutdown:
+        print("Shutting down all nodes ray processes and networking processes")
+        for node in cloud_ec2_info:
+            run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
+        for node in on_prem_ec2_info:
+            if not node["LoginNode"]:
+                run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", shutdown_all_processes_commands)
+            else:
+                run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
+        print("Finished shutting down all nodes ray processes and networking processes! Bye~")
 
 if __name__ == '__main__':
     main()
