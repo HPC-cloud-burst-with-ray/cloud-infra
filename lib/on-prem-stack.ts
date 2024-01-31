@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 import { OnPremVpcResources } from './vpc';
 import { EC2NodeResources } from './ec2';
 import { EC2StackProps } from './utils';
+import { RemovalPolicy } from 'aws-cdk-lib';
 import * as efs from 'aws-cdk-lib/aws-efs';
 
 export class OnPremStack extends Stack {
@@ -52,6 +53,7 @@ export class OnPremStack extends Stack {
       performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,
       throughputMode: efs.ThroughputMode.BURSTING,
       fileSystemPolicy: efsFileSystemPolicy,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
 
     // create one login side ec2 instance

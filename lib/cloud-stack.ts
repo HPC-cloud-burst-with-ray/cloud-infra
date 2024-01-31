@@ -5,6 +5,7 @@ import { EC2NodeResources } from './ec2';
 import { EC2StackProps } from './utils';
 import { aws_iam as iam } from 'aws-cdk-lib';
 import { aws_ec2 as ec2 } from 'aws-cdk-lib';
+import { RemovalPolicy } from 'aws-cdk-lib';
 import * as efs from 'aws-cdk-lib/aws-efs';
 
 export class CloudStack extends Stack {
@@ -42,6 +43,7 @@ export class CloudStack extends Stack {
       performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,
       throughputMode: efs.ThroughputMode.BURSTING,
       fileSystemPolicy: efsFileSystemPolicy,
+      removalPolicy: RemovalPolicy.DESTROY,
     });
 
     // generate node id string with two digits
