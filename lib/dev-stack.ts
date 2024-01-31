@@ -28,6 +28,7 @@ export class DevStack extends Stack {
         cpuType: cpuType,
         instanceSize: instanceSize,
         nodeType: 'CLOUD',
+        diskSize: 50,
     });
 
     devNode.instance.userData.addCommands(

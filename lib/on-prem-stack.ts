@@ -62,6 +62,7 @@ export class OnPremStack extends Stack {
       cpuType: cpuType,
       instanceSize: instanceSize,
       nodeType: 'ONPREM_LOGIN',
+      diskSize: 15,
     });
 
     // generate node id string with two digits
@@ -83,6 +84,7 @@ export class OnPremStack extends Stack {
         cpuType: cpuType,
         instanceSize: instanceSize,
         nodeType: 'ONPREM_WORKER',
+        diskSize: 15,
       });
       workerNodesArray.push(workerNode);
     }

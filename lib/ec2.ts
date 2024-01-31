@@ -37,6 +37,7 @@ interface ServerProps {
     cpuType: string;    // must be x86_64 for now
     instanceSize: string;
     nodeType: string;
+    diskSize: number;
 }
 
 let cpuType: AmazonLinuxCpuType;
@@ -44,6 +45,7 @@ let instanceClass: InstanceClass;
 let instanceSize: InstanceSize;
 let subnetSelection: SubnetSelection = {};
 let associatePublicIpAddress: boolean = false;
+let diskSize: number = 15;
 
 export class EC2NodeResources extends Construct{
     public instance: Instance;
@@ -125,6 +127,9 @@ export class EC2NodeResources extends Construct{
         // log ssh key for debug
         // console.log("ssh key: " + props.sshPubKey);
 
+        // calc disk size
+        diskSize = Math.max(diskSize, props.diskSize);
+
         // create instance
         this.instance = new Instance(this, 'Instance', {
             vpc: props.vpc,
@@ -138,7 +143,7 @@ export class EC2NodeResources extends Construct{
                     deviceName: '/dev/xvda',
                     volume: {
                         ebsDevice: {
-                            volumeSize: 15,
+                            volumeSize: diskSize,
                         },
                     },
                 },
