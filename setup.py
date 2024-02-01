@@ -20,8 +20,11 @@ config_mirror_commands = [
     "cd ~/ && sudo chmod u+x mirror",
 ]
 
-config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
-config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+config_sshuttle_commands = ["sudo yum install -y sshuttle"]
+config_rayenv_commands = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+
+# config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
+# config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
 remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
@@ -57,6 +60,9 @@ def get_ec2_info_from_stack(stack_name):
     return instances_info
 
 def run_commands_ssh(node_ip, user_name, commands):
+    if len(commands) == 0:
+        print("No commands to run")
+        return
     ssh = paramiko.SSHClient()
     try:
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -73,6 +79,9 @@ def run_commands_ssh(node_ip, user_name, commands):
     ssh.close()
 
 def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, commands):
+    if len(commands) == 0:
+        print("No commands to run")
+        return
     # ssh into login node, login node will ssh into other nodes and run commands
     ssh = paramiko.SSHClient()
     try:
@@ -138,7 +147,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
         print("Adding ssh key to on prem node: " + instance_id + " failed")
         print(e)
 
-def setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray):
+def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps):
     ssm = boto3.client('ssm')
     # get login node, on prem worker nodes, and cloud worker nodes
     login_node = None
@@ -150,36 +159,50 @@ def setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray):
         else:
             onprem_worker_nodes.append(node)
     cloud_worker_nodes = cluster_info["CloudNodesInfo"]
-    ssh_pub_login = ssm.get_parameter(Name='/sshkey/onprem/loginNode/id_rsa_pub')
-    # print(ssh_pub_login)
-    login_node["SSHPubKey"] = ssh_pub_login['Parameter']['Value']
-    cloud_worker_nodes.sort(key=lambda x: x["Name"])
-    node_index = 0
-    for node in cloud_worker_nodes:
-        # pad node_index to two digits
-        node_index_str = str(node_index)
-        if node_index < 10:
-            node_index_str = "0" + node_index_str
-        parameter_url = '/sshkey/cloud/cloudNode' + node_index_str + '/id_rsa_pub'
-        ssh_pub_cloud = ssm.get_parameter(Name=parameter_url)
-        node["SSHPubKey"] = ssh_pub_cloud['Parameter']['Value']
-        print("Finding ssh key for node: " + node["Name"] + " with parameter url: " + parameter_url)
-        print("ssh key: " + node["SSHPubKey"])
-        node_index += 1
-    # get into login node and setup ssh authorized keys for cloud nodes
-    ssh_keys_to_add = []
-    for node in cloud_worker_nodes:
-        ssh_keys_to_add.append(node["SSHPubKey"])
-    ssh_keys_to_add.extend(extra_ssh_keys_list)
-    add_authorized_keys_ssm(login_node["InstanceId"], ssh_keys_to_add)
-    # give public key of login node to all other nodes to enable ssh connection into all other nodes
-    for node in cloud_worker_nodes:
-        add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
-    for node in onprem_worker_nodes:
-        add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
-    # configure sshuttle on cloud node 
-    config_commands_onprem = config_rayenv_onprem_nodes + config_watchman_amz_linux_commands + config_mirror_commands
-    config_commands_cloud = config_rayenv_cloud_nodes + config_watchman_amz_linux_commands + config_mirror_commands
+    # configure ssh keys
+    if not skip_config_ssh:
+        ssh_pub_login = ssm.get_parameter(Name='/sshkey/onprem/loginNode/id_rsa_pub')
+        # print(ssh_pub_login)
+        login_node["SSHPubKey"] = ssh_pub_login['Parameter']['Value']
+        cloud_worker_nodes.sort(key=lambda x: x["Name"])
+        node_index = 0
+        for node in cloud_worker_nodes:
+            # pad node_index to two digits
+            node_index_str = str(node_index)
+            if node_index < 10:
+                node_index_str = "0" + node_index_str
+            parameter_url = '/sshkey/cloud/cloudNode' + node_index_str + '/id_rsa_pub'
+            ssh_pub_cloud = ssm.get_parameter(Name=parameter_url)
+            node["SSHPubKey"] = ssh_pub_cloud['Parameter']['Value']
+            print("Finding ssh key for node: " + node["Name"] + " with parameter url: " + parameter_url)
+            print("ssh key: " + node["SSHPubKey"])
+            node_index += 1
+        # get into login node and setup ssh authorized keys for cloud nodes
+        ssh_keys_to_add = []
+        for node in cloud_worker_nodes:
+            ssh_keys_to_add.append(node["SSHPubKey"])
+        ssh_keys_to_add.extend(extra_ssh_keys_list)
+        add_authorized_keys_ssm(login_node["InstanceId"], ssh_keys_to_add)
+        # give public key of login node to all other nodes to enable ssh connection into all other nodes
+        for node in cloud_worker_nodes:
+            add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
+        for node in onprem_worker_nodes:
+            add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
+        # also config ssh keys for dev node
+        if "DevNodesInfo" in cluster_info:
+            print("DevNodesInfo found in cluster_info, adding extra ssh keys to dev nodes")
+            dev_nodes = cluster_info["DevNodesInfo"]
+            assert len(dev_nodes) > 0
+            for node in dev_nodes:
+                add_authorized_keys_ssm(node["InstanceId"], extra_ssh_keys_list)
+        else:
+            print("No DevNodesInfo found in cluster_info")
+    # configure software deps
+    config_commands_onprem = []
+    config_commands_cloud = []
+    if install_all_deps:
+        config_commands_onprem = config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands
+        config_commands_cloud = config_sshuttle_commands + config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands
     if remove_existing_ray:
         config_commands_onprem = remove_existing_ray_commands + config_commands_onprem
         config_commands_cloud = remove_existing_ray_commands + config_commands_cloud
@@ -189,16 +212,6 @@ def setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray):
     # configure ray environment for all nodes
     for node in onprem_worker_nodes:
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_commands_onprem)
-    # add ssh keys in extra_ssh_keys_list to dev node if it exists
-    # don't install ray on dev nodes because we want to build from source code
-    if "DevNodesInfo" in cluster_info:
-        print("DevNodesInfo found in cluster_info, adding extra ssh keys to dev nodes")
-        dev_nodes = cluster_info["DevNodesInfo"]
-        assert len(dev_nodes) > 0
-        for node in dev_nodes:
-            add_authorized_keys_ssm(node["InstanceId"], extra_ssh_keys_list)
-    else:
-        print("No DevNodesInfo found in cluster_info")
 
 def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
     # will use the wheel file to overwrite the default installed ray
@@ -251,7 +264,7 @@ def setup_sshuttle_processes(cluster_info):
     for node in cluster_info["CloudNodesInfo"]:
         cloud_nodes_ips.append(node["PublicIp"])
     login_node_ip = login_node["PublicIp"]
-    sshuttle_command = f"sshuttle --ssh-cmd 'ssh -o StrictHostKeyChecking=no' -NHr ec2-user@{login_node_ip} {onprem_nodes_ips_str}"
+    sshuttle_command = f"sshuttle --ssh-cmd 'ssh -o StrictHostKeyChecking=no' --verbose -NHr ec2-user@{login_node_ip} {onprem_nodes_ips_str}"
     session_name = "sshuttle_session"
     sshuttle_tmux_command = convert_command_to_tmux_command(session_name, sshuttle_command)
     sshuttle_tmux_commands = [f"tmux kill-session -t {session_name}", sshuttle_tmux_command]
@@ -324,14 +337,21 @@ def setup_ray_processes(cluster_info):
     print(f"ssh -L 8265:localhost:8265 ec2-user@{login_node_public_ip}")
 
 @click.command()
+# cluster config file about nodes and ssh keys, etc.
 @click.option('--cluster-config', default='cdk-app-config.json', help='cluster config file, default is cdk-app-config.json')
+# ssh options
+@click.option('--skip-config-ssh', is_flag=True, default=False, help='skip configuring ssh, because they are already configured')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
+# environment options, whether to install, remove or use custom wheel
 @click.option('--remove-existing-ray', is_flag=True, default=False, help='remove existing ray installation')
-@click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI')
+@click.option('--install-all-deps', is_flag=True, default=False, help='install official ray, sshuttle, watchman, mirror and other dependencies')
+@click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI to curl from')
+# whether to run network auto-configuration
 @click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
+# run ray start commands
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
 @click.option('--shutdown', is_flag=True, default=False, help='shutdown all nodes ray processes and networking processes')
-def main(cluster_config, extra_ssh_keys, remove_existing_ray, custom_ray_wheel, run_sshuttle, run_ray, shutdown):
+def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, run_sshuttle, run_ray, shutdown):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -382,7 +402,7 @@ def main(cluster_config, extra_ssh_keys, remove_existing_ray, custom_ray_wheel, 
             for obj in extra_ssh_keys_kv:
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
-    setup_env(cluster_info, extra_ssh_keys_list, remove_existing_ray)
+    setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps)
     if custom_ray_wheel != "":
         print('Setting up custom ray wheel from URL: ' + custom_ray_wheel)
         setup_custom_ray_wheel(cluster_info, custom_ray_wheel)
