@@ -20,7 +20,7 @@ config_mirror_commands = [
     "cd ~/ && sudo chmod u+x mirror",
 ]
 
-config_sshuttle_commands = ["sudo yum install -y sshuttle"]
+config_sshuttle_commands = ["pip3 install sshuttle"]
 config_rayenv_commands = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
 # config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
@@ -256,7 +256,7 @@ def setup_sshuttle_processes(cluster_info):
     onprem_nodes_ips = []
     login_node = None
     for node in cluster_info["OnPremNodesInfo"]:
-        onprem_nodes_ips.append(node["PrivateIp"])
+        onprem_nodes_ips.append(node["PrivateIp"] + "/32")
         if node["LoginNode"]:
             login_node = node
     onprem_nodes_ips_str = " ".join(onprem_nodes_ips)
@@ -269,7 +269,7 @@ def setup_sshuttle_processes(cluster_info):
     sshuttle_tmux_command = convert_command_to_tmux_command(session_name, sshuttle_command)
     sshuttle_tmux_commands = [f"tmux kill-session -t {session_name}", sshuttle_tmux_command]
     for node_ip in cloud_nodes_ips:
-        print("Running sshuttle command: " + sshuttle_tmux_command)
+        # print("Running sshuttle command: " + sshuttle_tmux_command)
         run_commands_ssh(node_ip, "ec2-user", sshuttle_tmux_commands)
 
 def setup_ray_processes(cluster_info):

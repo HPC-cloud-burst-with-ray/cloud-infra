@@ -18,6 +18,7 @@ export class OnPremVpcResources extends Construct {
         // login node in this vpc will have public ip
         // worker nodes in this vpc will not have public ip (NAT)
         this.vpc = new Vpc(this, 'OnPremVPC', {
+            cidr: '10.0.0.0/16',
             natGateways: 1,
             subnetConfiguration: [
             {
@@ -68,6 +69,7 @@ export class CloudVpcResources extends Construct {
   
         // Create a VPC with public subnets in 1 AZ
         this.vpc = new Vpc(this, 'CloudVPC', {
+            cidr: '11.0.0.0/16',
             natGateways: 0,
             subnetConfiguration: [
             {
