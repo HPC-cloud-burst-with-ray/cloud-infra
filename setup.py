@@ -23,6 +23,8 @@ config_mirror_commands = [
 config_sshuttle_commands = ["pip3 install sshuttle"]
 config_rayenv_commands = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
+config_workloads_deps_commands = ["pip install sklearn torch torchvision filelock statsforecast pandas pyarrow"]
+
 # config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 # config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
@@ -147,7 +149,7 @@ def add_authorized_keys_ssm(instance_id, ssh_keys_to_add):
         print("Adding ssh key to on prem node: " + instance_id + " failed")
         print(e)
 
-def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps):
+def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps, install_workload_deps):
     ssm = boto3.client('ssm')
     # get login node, on prem worker nodes, and cloud worker nodes
     login_node = None
@@ -201,8 +203,11 @@ def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existin
     config_commands_onprem = []
     config_commands_cloud = []
     if install_all_deps:
-        config_commands_onprem = config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands
-        config_commands_cloud = config_sshuttle_commands + config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands
+        config_commands_onprem = config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands + config_workloads_deps_commands
+        config_commands_cloud = config_sshuttle_commands + config_rayenv_commands + config_watchman_amz_linux_commands + config_mirror_commands + config_workloads_deps_commands
+    elif install_workload_deps:
+        config_commands_onprem = config_workloads_deps_commands
+        config_commands_cloud = config_workloads_deps_commands
     if remove_existing_ray:
         config_commands_onprem = remove_existing_ray_commands + config_commands_onprem
         config_commands_cloud = remove_existing_ray_commands + config_commands_cloud
@@ -346,12 +351,14 @@ def setup_ray_processes(cluster_info):
 @click.option('--remove-existing-ray', is_flag=True, default=False, help='remove existing ray installation')
 @click.option('--install-all-deps', is_flag=True, default=False, help='install official ray, sshuttle, watchman, mirror and other dependencies')
 @click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI to curl from')
+# environment for running ray workloads
+@click.option('--install-workload-deps', is_flag=True, default=False, help='install software deps for ray workloads only')
 # whether to run network auto-configuration
 @click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
 # run ray start commands
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
 @click.option('--shutdown', is_flag=True, default=False, help='shutdown all nodes ray processes and networking processes')
-def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, run_sshuttle, run_ray, shutdown):
+def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, install_workload_deps, run_sshuttle, run_ray, shutdown):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -402,7 +409,7 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
             for obj in extra_ssh_keys_kv:
                 print("recognizing ssh key with name: " + obj["name"])
                 extra_ssh_keys_list.append(obj["key"])
-    setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps)
+    setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existing_ray, install_all_deps, install_workload_deps)
     if custom_ray_wheel != "":
         print('Setting up custom ray wheel from URL: ' + custom_ray_wheel)
         setup_custom_ray_wheel(cluster_info, custom_ray_wheel)
