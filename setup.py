@@ -187,7 +187,7 @@ def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existin
         add_authorized_keys_ssm(login_node["InstanceId"], ssh_keys_to_add)
         # give public key of login node to all other nodes to enable ssh connection into all other nodes
         for node in cloud_worker_nodes:
-            add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
+            add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]] + extra_ssh_keys_list)
         for node in onprem_worker_nodes:
             add_authorized_keys_ssm(node["InstanceId"], [login_node["SSHPubKey"]])
         # also config ssh keys for dev node
@@ -277,7 +277,7 @@ def setup_sshuttle_processes(cluster_info):
         # print("Running sshuttle command: " + sshuttle_tmux_command)
         run_commands_ssh(node_ip, "ec2-user", sshuttle_tmux_commands)
 
-def setup_ray_processes(cluster_info):
+def setup_ray_processes(cluster_info, skip_mirror):
     onprem_nodes = cluster_info["OnPremNodesInfo"]
     onprem_worker_nodes = []
     login_node = None
@@ -330,13 +330,16 @@ def setup_ray_processes(cluster_info):
     # finishing setting up ray processes
     print("Ray processes are set up, setting up unified distributed file system through mirror")
     # setup mirror process
-    login_node_share_dir = "~/share"
-    cloud_node_share_dir = "~/share"
-    mirror_server_command = "cd ~ && ./mirror server --skip-limit-checks"
-    mirror_client_command = f"cd ~ && ./mirror client -h {login_node_private_ip} -l {login_node_share_dir} -r {cloud_node_share_dir} --skip-limit-checks"
-    mirror_tmux_session_name = "mirror_session"
-    run_commands_ssh(login_node["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_server_command)])
-    run_commands_ssh(cloud_nodes[0]["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_client_command)])
+    if skip_mirror:
+        print("Skipping running mirror processes")
+    else:
+        login_node_share_dir = "~/share"
+        cloud_node_share_dir = "~/share"
+        mirror_server_command = "cd ~ && ./mirror server --skip-limit-checks"
+        mirror_client_command = f"cd ~ && ./mirror client -h {login_node_private_ip} -l {login_node_share_dir} -r {cloud_node_share_dir} --skip-limit-checks"
+        mirror_tmux_session_name = "mirror_session"
+        run_commands_ssh(login_node["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_server_command)])
+        run_commands_ssh(cloud_nodes[0]["PublicIp"], "ec2-user", [f"tmux kill-session -t {mirror_tmux_session_name}", convert_command_to_tmux_command(mirror_tmux_session_name, mirror_client_command)])
     print("Suggestion: Use VSCode remote ssh to get into login node and open up live server to view ray dashboard: http://localhost:8265")
     print("Suggestion: You can also use reverse tunnel to do this with the command below: ")
     print(f"ssh -L 8265:localhost:8265 ec2-user@{login_node_public_ip}")
@@ -355,10 +358,11 @@ def setup_ray_processes(cluster_info):
 @click.option('--install-workload-deps', is_flag=True, default=False, help='install software deps for ray workloads only')
 # whether to run network auto-configuration
 @click.option('--run-sshuttle', is_flag=True, default=False, help='configure sshuttle')
+@click.option('--skip-mirror', is_flag=True, default=False, help='skip running mirror processes')
 # run ray start commands
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
 @click.option('--shutdown', is_flag=True, default=False, help='shutdown all nodes ray processes and networking processes')
-def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, install_workload_deps, run_sshuttle, run_ray, shutdown):
+def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, install_workload_deps, run_sshuttle, skip_mirror, run_ray, shutdown):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -421,7 +425,7 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
         setup_sshuttle_processes(cluster_info)
     if run_ray:
         print("Running ray commands on all nodes")
-        setup_ray_processes(cluster_info)
+        setup_ray_processes(cluster_info, skip_mirror)
     if shutdown:
         print("Shutting down all nodes ray processes and networking processes")
         for node in cloud_ec2_info:
