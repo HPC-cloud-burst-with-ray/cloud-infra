@@ -32,7 +32,16 @@ remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
 shutdown_all_processes_commands = ["ray stop", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
 
+def get_num_cpus(instance_info):
+    return instance_info["VCpuInfo"]["DefaultVCpus"]
+
+def get_num_gpus(instance_info):
+    if instance_info["VGpuInfo"] is None:
+        return 0
+    return len(instance_info["VGpuInfo"]["Gpus"])
+
 def get_ec2_info_from_stack(stack_name):
+    print("Getting EC2 info from stack: " + stack_name)
     cloudformation = boto3.client('cloudformation')
     ec2_client = boto3.client('ec2')
     try:
@@ -58,6 +67,19 @@ def get_ec2_info_from_stack(stack_name):
             instance_info["InstanceId"] = instance['InstanceId']
             instance_info["PublicIp"] = instance.get('PublicIpAddress', "")
             instance_info["PrivateIp"] = instance['PrivateIpAddress']
+            # fill in cpu gpu number
+            instance_type_name = instance['InstanceType']
+            instance_type = ec2_client.describe_instance_types(InstanceTypes=[instance_type_name])
+            # print(instance_type['InstanceTypes'][0])
+            current_vcpu_info = instance_type['InstanceTypes'][0]['VCpuInfo']
+            # current_vcpu_count = instance_type['InstanceTypes'][0]['VCpuInfo']['DefaultVCpus']
+            current_vgpu_info = instance_type['InstanceTypes'][0].get('GpuInfo', None)
+            # current_vgpu_count = instance_type['InstanceTypes'][0]['GpuInfo']['Gpus']
+            instance_info["VCpuInfo"] = current_vcpu_info
+            instance_info["VGpuInfo"] = current_vgpu_info
+            current_vcpu_count = get_num_cpus(instance_info)
+            current_vgpu_info = get_num_gpus(instance_info)
+            print("Instance type: " + instance_type_name + " has vcpu count: " + str(current_vcpu_count) + " and gpu count: " + str(current_vgpu_info))
             instances_info.append(instance_info)
     return instances_info
 
@@ -294,24 +316,36 @@ def setup_ray_processes(cluster_info, skip_mirror):
     client_server_port = 10001
     min_worker_port = 30010
     max_worker_port = 30050
-    num_cpus = 2
-    num_gpus = 0
+    # num_cpus = 2
+    # num_gpus = 0
+    num_cpu_head = get_num_cpus(login_node)
+    num_gpu_head = get_num_gpus(login_node)
+    print("Num CPU on login node: " + str(num_cpu_head))
+    print("Num GPU on login node: " + str(get_num_gpus(login_node)))
     node_manager_port = 30008
     object_manager_port = 30009
     redis_password = "12345678"
-    ray_command_head = f"ray start --head --node-ip-address={login_node_private_ip} --port={gcs_port} --dashboard-port={dashboard_port} --num-cpus {num_cpus} --num-gpus {num_gpus} --ray-client-server-port {client_server_port} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+    ray_command_head = f"ray start --head --node-ip-address={login_node_private_ip} --port={gcs_port} --dashboard-port={dashboard_port} --num-cpus {num_cpu_head} --num-gpus {num_gpu_head} --ray-client-server-port {client_server_port} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
     head_address = f"{login_node_private_ip}:{gcs_port}"
     ray_onprem_worker_commands = []
     for i in range(len(onprem_worker_nodes)):
         node = onprem_worker_nodes[i]
         node_ip = node["PrivateIp"]
-        ray_onprem_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpus} --num-gpus {num_gpus} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        num_cpu_onprem_worker = get_num_cpus(node)
+        num_gpu_onprem_worker = get_num_gpus(node)
+        print("Num CPU on onprem worker node: " + str(num_cpu_onprem_worker))
+        print("Num GPU on onprem worker node: " + str(num_gpu_onprem_worker))
+        ray_onprem_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_onprem_worker} --num-gpus {num_gpu_onprem_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
         ray_onprem_worker_commands.append(ray_onprem_worker_command)
     ray_cloud_worker_commands = []
     for i in range(len(cloud_nodes)):
         node = cloud_nodes[i]
         node_ip = node["PublicIp"]
-        ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpus} --num-gpus {num_gpus} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        num_cpu_cloud_worker = get_num_cpus(node)
+        num_gpu_cloud_worker = get_num_gpus(node)
+        print("Num CPU on cloud worker node: " + str(num_cpu_cloud_worker))
+        print("Num GPU on cloud worker node: " + str(num_gpu_cloud_worker))
+        ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_cloud_worker} --num-gpus {num_gpu_cloud_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
         ray_cloud_worker_commands.append(ray_cloud_worker_command)
     # start to close all previous ray processes
     run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
