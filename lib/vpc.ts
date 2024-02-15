@@ -57,6 +57,10 @@ export class OnPremVpcResources extends Construct {
         // also allow port 2049 for efs
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
         this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
+        // add ping with ICMP
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.icmpPing());
+        // add UDP for iperf3 on ports from 10000 to 65535
+        this.onPremSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.udpRange(10000, 65535));
     }
 }
 
@@ -103,6 +107,10 @@ export class CloudVpcResources extends Construct {
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
         // add 8888 for jupyter and file transfer
         this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
+        // add support for ping (ICMP)
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.icmpPing());
+        // add UDP for iperf3 on ports from 10000 to 65535
+        this.cloudSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.udpRange(10000, 65535));
     }
 }
 
@@ -139,5 +147,10 @@ export class DevVpcResources extends Construct {
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80));
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(2049));
         this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(8888));
+        // add support for ping
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.icmpPing());
+        // add support for iperf3 udp and tcp
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.udpRange(10000, 65535));
+        this.devSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcpRange(10000, 65535));
     }
 }
