@@ -9,7 +9,13 @@ class NetworkEmulator(NetworkTopology):
         if topology_file:
             self.import_from_json(topology_file)
 
-    def get_netem_command(self, edge):
+    def get_netem_filter_commands(self, edge, device, target_ip):
+        pass
+
+    def get_netem_qdisc_commands(self, edge, device):
+        pass
+
+    def get_netem_disable_commands(self, edge, device):
         pass
 
 if __name__ == "__main__":
