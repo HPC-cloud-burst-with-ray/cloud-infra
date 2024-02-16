@@ -3,6 +3,7 @@ import boto3
 import json
 import paramiko
 import time
+from networking.netem import NetworkEmulator
 
 # pip3 install sshuttle
 # pip3 install ray

@@ -1,0 +1,194 @@
+{
+    "directed": true,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+        {
+            "id": "Cloud"
+        },
+        {
+            "id": "HPCLogin"
+        },
+        {
+            "id": "HPCWorker"
+        }
+    ],
+    "links": [
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    5000,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "Cloud",
+            "target": "Cloud"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    6,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "Cloud",
+            "target": "HPCLogin"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    650,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "Cloud",
+            "target": "HPCWorker"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    900,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "HPCLogin",
+            "target": "HPCWorker"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    1000,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "HPCLogin",
+            "target": "Cloud"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    900,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "HPCWorker",
+            "target": "HPCLogin"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    900,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "HPCWorker",
+            "target": "HPCWorker"
+        },
+        {
+            "condition": {
+                "rtt": [
+                    10,
+                    0
+                ],
+                "bandwidth": [
+                    6,
+                    0
+                ],
+                "jitter": [
+                    0.1,
+                    0
+                ],
+                "loss": [
+                    0,
+                    0
+                ]
+            },
+            "source": "HPCWorker",
+            "target": "Cloud"
+        }
+    ]
+}
