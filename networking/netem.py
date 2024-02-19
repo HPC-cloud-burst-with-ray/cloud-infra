@@ -1,5 +1,13 @@
-from topology import NetworkTopology
-from topology import NetworkCondition
+# from .topology import NetworkTopology
+# from .topology import NetworkCondition
+
+# run the file as a script for unit testing, or part of the package
+try :
+    from .topology import NetworkTopology
+    from .topology import NetworkCondition
+except ImportError:
+    from topology import NetworkTopology
+    from topology import NetworkCondition
 
 '''
 tc commands to set delay, bandwidth, jitter, and and packet loss (even = 0) to a certain network interface and a specific IP
@@ -9,7 +17,7 @@ sudo iptables -t mangle -A OUTPUT -p tcp -d 192.168.1.100 -j MARK --set-mark 1
 sudo tc qdisc add dev eth0 root handle 1: prio
 
 sudo tc qdisc add dev eth0 parent 1:3 handle 30: netem delay 20ms 2ms
-sudo tc qdisc add dev eth0 parent 30:1 handle 31: tbf rate 6mbit burst 32kbit latency 50ms
+sudo tc qdisc add dev eth0 parent 30:1 handle 31: tbf rate 6mbit burst 32kbit latency 20ms
 
 sudo tc filter add dev eth0 protocol ip parent 1:0 prio 3 handle 1 fw flowid 1:3
 '''
@@ -22,21 +30,29 @@ class NetworkEmulator(NetworkTopology):
         if topology_file:
             self.import_from_json(topology_file)
 
-    def __get_netem_filter_commands(self, edge, device, target_ip):
-        pass
-
-    def __get_netem_qdisc_commands(self, edge, device):
-        pass
-
     def __get_edge_condition(self, edge):
         return self.graph.edges[edge]["condition"]
 
     def get_netem_setup_commands(self, edge, device, target_ip):
         network_condition = self.__get_edge_condition(edge)
-        # print(network_condition.to_dict())
+        bandwidth = network_condition.bandwidth
+        rtt = network_condition.rtt
+        commands = [
+            f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
+            f"sudo tc qdisc add dev {device} root handle 1: prio",
+            f"sudo tc qdisc add dev {device} parent 1:3 handle 30: netem delay {rtt[0]}ms {rtt[1]}ms",
+            f"sudo tc qdisc add dev {device} parent 30:1 handle 31: tbf rate {bandwidth[0]}mbit burst 32kbit latency 20ms",
+            f"sudo tc filter add dev {device} protocol ip parent 1:0 prio 3 handle 1 fw flowid 1:3"
+        ]
+        return commands
 
-    def get_netem_disable_commands(self, edge, device):
-        pass
+
+    def get_netem_disable_commands(self, device, target_ip):
+        commands = [
+            f"sudo tc qdisc del dev {device} root",
+            f"sudo iptables -t mangle -D OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
+        ]
+        return commands
 
 if __name__ == "__main__":
     netem = NetworkEmulator()
@@ -78,4 +94,26 @@ if __name__ == "__main__":
     # test generate tc netem commands
     print("[NOTE] tc affects the outgoing traffic, so the commands are generated for the source node")
     print("HPCLogin -> Cloud, apply command to HPCLogin")
-    netem.get_netem_setup_commands(("HPCLogin", "Cloud"), "ens5", "54.211.29.176")
+    hpc_pri_ip = "10.0.0.13"
+    cloud_pub_ip = "54.211.29.176"
+    device = "ens5"
+    print("commands for HPCLogin -> Cloud")
+    login_node_commands = netem.get_netem_setup_commands(("HPCLogin", "Cloud"), device, cloud_pub_ip)
+    for command in login_node_commands:
+        print(command)
+    print()
+    print("commands for Cloud -> HPCLogin")
+    cloud_node_commands = netem.get_netem_setup_commands(("Cloud", "HPCLogin"), device, hpc_pri_ip)
+    for command in cloud_node_commands:
+        print(command)
+    print()
+    print("commands for disable network emulation HPCLogin -> Cloud")
+    login_node_disable_commands = netem.get_netem_disable_commands(device, cloud_pub_ip)
+    for command in login_node_disable_commands:
+        print(command)
+    print()
+    print("commands for disable network emulation Cloud -> HPCLogin")
+    cloud_node_disable_commands = netem.get_netem_disable_commands(device, hpc_pri_ip)
+    for command in cloud_node_disable_commands:
+        print(command)
+    print()
