@@ -17,7 +17,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    0.3,
                     0
                 ],
                 "bandwidth": [
@@ -39,11 +39,11 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    20,
                     0
                 ],
                 "bandwidth": [
-                    6,
+                    1000,
                     0
                 ],
                 "jitter": [
@@ -61,7 +61,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    20,
                     0
                 ],
                 "bandwidth": [
@@ -83,7 +83,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    1,
                     0
                 ],
                 "bandwidth": [
@@ -105,11 +105,11 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    20,
                     0
                 ],
                 "bandwidth": [
-                    1000,
+                    6,
                     0
                 ],
                 "jitter": [
@@ -127,7 +127,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    1,
                     0
                 ],
                 "bandwidth": [
@@ -149,7 +149,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    1,
                     0
                 ],
                 "bandwidth": [
@@ -171,7 +171,7 @@
         {
             "condition": {
                 "rtt": [
-                    10,
+                    20,
                     0
                 ],
                 "bandwidth": [
