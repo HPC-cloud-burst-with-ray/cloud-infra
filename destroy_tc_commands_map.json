@@ -1,0 +1,14 @@
+{
+    "OnPremStack/OnPremLogin/Instance": [
+        "sudo tc qdisc del dev ens5 root",
+        "sudo iptables -t mangle -F OUTPUT"
+    ],
+    "OnPremStack/OnPremWorker00/Instance": [
+        "sudo tc qdisc del dev ens5 root",
+        "sudo iptables -t mangle -F OUTPUT"
+    ],
+    "CloudStack/CloudNode00/Instance": [
+        "sudo tc qdisc del dev ens5 root",
+        "sudo iptables -t mangle -F OUTPUT"
+    ]
+}

@@ -35,6 +35,7 @@ remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
 shutdown_all_processes_commands = ["ray stop", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
 
+
 def get_num_cpus(instance_info):
     return instance_info["VCpuInfo"]["DefaultVCpus"]
 
@@ -302,7 +303,7 @@ def setup_sshuttle_processes(cluster_info):
         # print("Running sshuttle command: " + sshuttle_tmux_command)
         run_commands_ssh(node_ip, "ec2-user", sshuttle_tmux_commands)
 
-def get_tc_netem_links(cluster_info):
+def get_tc_netem_links(cluster_info, node_name_map):
     login_node = None
     onprem_worker_nodes = []
     cloud_worker_nodes = []
@@ -319,19 +320,20 @@ def get_tc_netem_links(cluster_info):
     for node in cloud_worker_nodes:
         node["NetEmLabel"] = CLOUD
     netem_links = {}
-    netem_links[login_node] = []
+    netem_links[login_node["Name"]] = []
     for node in onprem_worker_nodes:
-        netem_links[login_node].append(node)
-        netem_links[node] = [login_node]
+        netem_links[login_node["Name"]].append(node["Name"])
+        netem_links[node["Name"]] = [login_node["Name"]]
     for node in cloud_worker_nodes:
-        netem_links[login_node].append(node)
-        netem_links[node] = [login_node]
+        netem_links[login_node["Name"]].append(node["Name"])
+        netem_links[node["Name"]] = [login_node["Name"]]
     # mutal links between onprem and cloud nodes
     if len(onprem_worker_nodes) > 1:
         for node in onprem_worker_nodes:
-            other_nodes = onprem_worker_nodes.copy()
-            other_nodes.remove(node)
-            netem_links[node].extend(other_nodes)
+            other_nodes_names = [x["Name"] for x in onprem_worker_nodes]
+            other_nodes_names.remove(node["Name"])
+            netem_links[node["Name"]].extend(other_nodes_names["Name"])
+    print(netem_links)
     return netem_links
 
 def get_target_ip(src_node, dst_node):
@@ -364,20 +366,22 @@ def dump_tc_commands_map_to_json(commands_map, json_file_name):
     # for each key of the map, only dump the "Name" field
     output_map = {}
     for key, value in commands_map.items():
-        output_map[key["Name"]] = value
+        output_map[key] = value
     with open(json_file_name, "w") as file:
         json.dump(output_map, file, indent=4)
 
-def setup_tc_network_emulator(cluster_info, netem):
+def setup_tc_network_emulator(cluster_info, node_name_map, netem):
     # setup tc commands in each node
-    netem_links = get_tc_netem_links(cluster_info)
+    netem_links = get_tc_netem_links(cluster_info, node_name_map)
     # loop over the map to generate tc commands
     device = "ens5"
     commands_map = {}
-    for src_node, dst_nodes in netem_links.items():
+    for src_node_name, dst_nodes_names in netem_links.items():
         node_outbound_link_id = 1
         disable_tc_commands = netem.get_netem_disable_commands(device)
-        commands_map[src_node] = disable_tc_commands
+        commands_map[src_node_name] = disable_tc_commands
+        dst_nodes = [node_name_map[x] for x in dst_nodes_names]
+        src_node = node_name_map[src_node_name]
         for dst_node in dst_nodes:
             edge = (src_node["NetEmLabel"], dst_node["NetEmLabel"])
             # skip login to hpc worker and hpc worker to login
@@ -390,26 +394,53 @@ def setup_tc_network_emulator(cluster_info, netem):
             tc_commands = netem.get_netem_setup_commands(edge, device, target_ip, node_outbound_link_id)
             node_outbound_link_id += 1
             # extend the commands to run
-            commands_map[src_node].extend(tc_commands)
+            commands_map[src_node_name].extend(tc_commands)
     # dump commands map to json
     dump_tc_commands_map_to_json(commands_map, "setup_tc_commands_map.json")
     # run tc commands on each node
     print("Running tc commands on each node")
-    # TODO
+    login_node = None
+    for node in cluster_info["OnPremNodesInfo"]:
+        if node["LoginNode"]:
+            login_node = node
+    for node_name, commands in commands_map.items():
+        node = node_name_map[node_name]
+        print("Running tc commands for node: " + node_name)
+        if node.get("PublicIp") is not None and node.get("PublicIp") != "":
+            run_commands_ssh(node["PublicIp"], "ec2-user", commands)
+            # print("commands for node: " + node["Name"])
+        else:
+            run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", commands)
+            # print("commands for node: " + node["Name"])
+    
+    
 
-def destroy_tc_network_emulator(cluster_info, netem):
-    netem_links = get_tc_netem_links(cluster_info)
+def destroy_tc_network_emulator(cluster_info, node_name_map, netem):
+    netem_links = get_tc_netem_links(cluster_info, node_name_map)
     # loop over the map to generate tc commands
     device = "ens5"
     commands_map = {}
-    for src_node in netem_links.keys():
+    for src_node_name in netem_links.keys():
+        src_node = node_name_map[src_node_name]
         disable_tc_commands = netem.get_netem_disable_commands(device)
-        commands_map[src_node] = disable_tc_commands
+        commands_map[src_node_name] = disable_tc_commands
     # dump commands map to json
     dump_tc_commands_map_to_json(commands_map, "destroy_tc_commands_map.json")
     # run tc commands on each node
     print("Running tc commands on each node")
-    # TODO
+    login_node = None
+    for node in cluster_info["OnPremNodesInfo"]:
+        if node["LoginNode"]:
+            login_node = node
+    for node_name, commands in commands_map.items():
+        node = node_name_map[node_name]
+        if node.get("PublicIp") is not None:
+            run_commands_ssh(node["PublicIp"], "ec2-user", commands)
+            # print("commands for node: " + node["Name"])
+        else:
+            run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", commands)
+            # print("commands for node: " + node["Name"])
+
             
 
 def setup_ray_processes(cluster_info, skip_mirror):
@@ -518,9 +549,10 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
         # print(ray_config)
     # fill in cluster_info
     if shutdown:
-        print("Shutting down all nodes ray processes and networking processes, disable run-sshuttle and run-ray flags")
+        print("Shutting down all nodes ray processes and networking processes, disable the run flags")
         run_sshuttle = False
         run_ray = False
+        run_tc_netem = False
     cluster_info = {}
     cluster_info["NumCloudNodes"] = ray_config["cloud"]["WORKER_NODE_NUM"]
     cluster_info["NumOnPremNodes"] = ray_config["onprem"]["WORKER_NODE_NUM"] + 1 # add login node itself
@@ -529,9 +561,15 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
     # fetch node names from cloud formation stack OnPremStack and CloudStack
     on_prem_ec2_info = get_ec2_info_from_stack("OnPremStack")
     cluster_info["OnPremNodesInfo"] = on_prem_ec2_info
+    # register nodes by name
+    node_name_map = {}
+    def register_node(node):
+        nonlocal node_name_map
+        node_name_map[node["Name"]] = node
     login_node = None
     # filter for login node who has public ip
     for node in on_prem_ec2_info:
+        register_node(node)
         if node["PublicIp"] != "":
             node["LoginNode"] = True
             login_node = node
@@ -541,12 +579,16 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
     print(on_prem_ec2_info)
     cloud_ec2_info = get_ec2_info_from_stack("CloudStack")
     cluster_info["CloudNodesInfo"] = cloud_ec2_info
+    for node in cloud_ec2_info:
+        register_node(node)
     print("Cloud Stack Cluster Info: ")
     print(cloud_ec2_info)
     # try to find dev stack
     dev_ec2_info = get_ec2_info_from_stack("DevStack")
     if dev_ec2_info is not None:
         cluster_info["DevNodesInfo"] = dev_ec2_info
+        for node in dev_ec2_info:
+            register_node(node)
         print("Dev Stack Cluster Info: ")
         print(dev_ec2_info)
     # dump cluster_info to file for users to review
@@ -565,15 +607,14 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
     if custom_ray_wheel != "":
         print('Setting up custom ray wheel from URL: ' + custom_ray_wheel)
         setup_custom_ray_wheel(cluster_info, custom_ray_wheel)
-    # open up long running processes
+    # auto open sshuttle if running ray (comment out if sshuttle needs to be run manually)
     # if run_ray:
     #     run_sshuttle = True
     if run_sshuttle:
         print("Running sshuttle on all cloud nodes and tunnel to on prem nodes")
         setup_sshuttle_processes(cluster_info)
     else:
-        print("Skipping running tc netem because run-sshuttle flag is not set")
-        run_tc_netem = False
+        print("Not running sshuttle by script, assume sshuttle is already running by manual commands if further steps need it")
     if run_tc_netem:
         print("Running tc netem on cloud nodes and HPC nodes to simulate network conditions")
         try:
@@ -582,7 +623,7 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
             print("Failed to read default network topology file: ./network_topology_no_sshuttle.json")
             print(e)
             return
-        setup_tc_network_emulator(cluster_info, netem)
+        setup_tc_network_emulator(cluster_info, node_name_map, netem)
     if run_ray:
         print("Running ray commands on all nodes")
         setup_ray_processes(cluster_info, skip_mirror)
@@ -595,6 +636,14 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
                 run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", shutdown_all_processes_commands)
             else:
                 run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
+        print("Closing all network emulation by tc")
+        try:
+            netem = NetworkEmulator("network_topology_no_sshuttle.json")
+            destroy_tc_network_emulator(cluster_info, node_name_map, netem)
+        except Exception as e:
+            print("Failed to read default network topology file: ./network_topology_no_sshuttle.json")
+            print(e)
+            return
         print("Finished shutting down all nodes ray processes and networking processes! Bye~")
 
 if __name__ == '__main__':
