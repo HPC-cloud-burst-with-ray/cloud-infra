@@ -246,9 +246,9 @@ def setup_env(cluster_info, skip_config_ssh, extra_ssh_keys_list, remove_existin
 
 def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
     # will use the wheel file to overwrite the default installed ray
-    # example custom_ray_wheel: http://34.207.251.137:8888/ray.whl
-    filename = custom_ray_wheel.split('/')[-1]
-    curl_command = f"curl -o {filename} {custom_ray_wheel}"
+    # check if URL is http or s3
+    # http example: http://23.21.12.11:8888/ray-3.0.0.dev0-cp310-cp310-linux_x86_64.whl
+    # s3 example: s3://wheelbucket/ray-3.0.0.dev0-cp310-cp310-linux_x86_64.whl 
     login_node = None
     cloud_worker_nodes = []
     onprem_worker_nodes = []
@@ -262,17 +262,22 @@ def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
     login_node_ip = login_node["PublicIp"]
     login_node_user = "ec2-user"
     login_node_share_dir = "~/share"
-    run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && {curl_command}"])
-    # first cloud node curl to ~/share, then let NFS share to other nodes
+    # cloud nodes
     cloud_node = cloud_worker_nodes[0]
     cloud_node_ip = cloud_node["PublicIp"]
     cloud_node_user = "ec2-user"
     cloud_node_share_dir = "~/share"
-    run_commands_ssh(cloud_node_ip, cloud_node_user, [f"cd {cloud_node_share_dir} && {curl_command}"])
-    # give some time for NFS to sync
-    time.sleep(15)
-    # overwrite ray wheel on all nodes
-    # force_reinstall_flag = "--force-reinstall"
+    # filename
+    filename = custom_ray_wheel.split('/')[-1]
+    if custom_ray_wheel.startswith("http"):
+        curl_command = f"curl -o {filename} {custom_ray_wheel}"
+        run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && {curl_command}"])
+        run_commands_ssh(cloud_node_ip, cloud_node_user, [f"cd {cloud_node_share_dir} && {curl_command}"])
+        time.sleep(15)
+    elif custom_ray_wheel.startswith("s3"):
+        # download from s3, will support later
+        raise Exception("S3 download not supported yet")
+    # begin to install by ray wheel
     force_reinstall_flag = " "
     run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
     for node in onprem_worker_nodes:
@@ -531,7 +536,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
 # environment options, whether to install, remove or use custom wheel
 @click.option('--remove-existing-ray', is_flag=True, default=False, help='remove existing ray installation')
 @click.option('--install-all-deps', is_flag=True, default=False, help='install official ray, sshuttle, watchman, mirror and other dependencies')
-@click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI to curl from')
+@click.option('--custom-ray-wheel', default="", help='install self defined ray built from source code, parameter should be an URI to curl from or a S3 URL')
 # environment for running ray workloads
 @click.option('--install-workload-deps', is_flag=True, default=False, help='install software deps for ray workloads only')
 # whether to run network auto-configuration

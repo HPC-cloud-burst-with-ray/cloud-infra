@@ -88,12 +88,14 @@ export class EC2NodeResources extends Construct{
         // determine cpu and instance size
         if (props.cpuType === 'x86_64') {
             cpuType = AmazonLinuxCpuType.X86_64;
-            instanceClass = InstanceClass.M5;
         } else {
             // don't support arm yet, raise error
             throw new Error('Unsupported cpu type');
         }
-        
+
+        // determine instance class (C5 or M5 for example, default to M5 to save cost)
+        instanceClass = InstanceClass.C5;
+
         switch (props.instanceSize) {
             case 'LARGE':
               instanceSize = InstanceSize.LARGE;

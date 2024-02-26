@@ -12,11 +12,11 @@
 
     "cloud": {
         "WORKER_NODE_NUM": 1,
-        "INSTANCE_SIZE": "LARGE"
+        "INSTANCE_SIZE": "XLARGE4"
     },
 
     "onprem": {
         "WORKER_NODE_NUM": 1,
-        "INSTANCE_SIZE": "LARGE"
+        "INSTANCE_SIZE": "XLARGE4"
     }
   }
