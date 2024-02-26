@@ -5,9 +5,11 @@
 try :
     from .topology import NetworkTopology
     from .topology import NetworkCondition
+    from .topology import CLOUD, HPC_LOGIN, HPC_WORKER
 except ImportError:
     from topology import NetworkTopology
     from topology import NetworkCondition
+    from topology import CLOUD, HPC_LOGIN, HPC_WORKER
 
 '''
 template commands below
@@ -35,28 +37,39 @@ class NetworkEmulator(NetworkTopology):
     def __get_edge_condition(self, edge):
         return self.graph.edges[edge]["condition"]
 
-    def get_netem_setup_commands(self, edge, device, target_ip):
+    def get_netem_setup_commands(self, edge, device, target_ip, link_id=1):
+        mask = link_id
+        qdisc_handle = link_id
+        netem_handle = qdisc_handle * 10 + 0
+        tbf_handle = qdisc_handle * 10 + 1
         network_condition = self.__get_edge_condition(edge)
         bandwidth = network_condition.bandwidth
         rtt = network_condition.rtt
         commands = [
             # f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
-            f"sudo iptables -t mangle -A OUTPUT -d {target_ip} -j MARK --set-mark 1",
+            f"sudo iptables -t mangle -A OUTPUT -d {target_ip} -j MARK --set-mark {mask}",
             # f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} --tcp-flags ALL ACK -j RETURN",
-            f"sudo tc qdisc add dev {device} root handle 1: prio",
-            f"sudo tc qdisc add dev {device} parent 1:3 handle 30: netem delay {rtt[0]/2}ms {rtt[1]/2}ms",
-            f"sudo tc qdisc add dev {device} parent 30:1 handle 31: tbf rate {bandwidth[0]}mbit burst 32kbit latency 10ms",
-            f"sudo tc filter add dev {device} protocol ip parent 1:0 prio 3 handle 1 fw flowid 1:3"
+            f"sudo tc qdisc add dev {device} root handle {qdisc_handle}: prio",
+            f"sudo tc qdisc add dev {device} parent {qdisc_handle}:3 handle {netem_handle}: netem delay {rtt[0]/2}ms {rtt[1]/2}ms",
+            f"sudo tc qdisc add dev {device} parent {netem_handle}:1 handle {tbf_handle}: tbf rate {bandwidth[0]}mbit burst 32kbit latency 10ms",
+            f"sudo tc filter add dev {device} protocol ip parent {qdisc_handle}:0 prio 3 handle {mask} fw flowid {qdisc_handle}:3"
         ]
         return commands
 
 
-    def get_netem_disable_commands(self, device, target_ip):
-        commands = [
-            f"sudo tc qdisc del dev {device} root",
-            # f"sudo iptables -t mangle -D OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
-            f"sudo iptables -t mangle -D OUTPUT -d {target_ip} -j MARK --set-mark 1",
-        ]
+    def get_netem_disable_commands(self, device, target_ip=None, link_id=1):
+        mask = link_id
+        if target_ip is None:
+            commands = [
+                f"sudo tc qdisc del dev {device} root",
+                f"sudo iptables -t mangle -F OUTPUT",
+            ]
+        else:
+            commands = [
+                f"sudo tc qdisc del dev {device} root",
+                # f"sudo iptables -t mangle -D OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
+                f"sudo iptables -t mangle -D OUTPUT -d {target_ip} -j MARK --set-mark {mask}",
+            ]
         return commands
     
     def get_netem_qdisc_status_commands(self, device):

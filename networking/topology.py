@@ -1,6 +1,10 @@
 import json
 import networkx as nx
 
+HPC_LOGIN = "HPCLogin"
+HPC_WORKER = "HPCWorker"
+CLOUD = "Cloud"
+
 class NetworkCondition:
     def __init__(self, rtt=(0, 0), bandwidth=(0, 0), jitter=(0, 0), loss=(0, 0)):
         # check if all the tuples are of length 2
@@ -55,9 +59,9 @@ def decode_network_condition(dct):
 class NetworkTopology:
     def __init__(self):
         self.graph = nx.DiGraph()
-        self.graph.add_node("Cloud")
-        self.graph.add_node("HPCLogin")
-        self.graph.add_node("HPCWorker")
+        self.graph.add_node(CLOUD)
+        self.graph.add_node(HPC_LOGIN)
+        self.graph.add_node(HPC_WORKER)
 
     def add_edge(self, node1, node2, condition: NetworkCondition):
         if node1 not in self.graph.nodes or node2 not in self.graph.nodes:
