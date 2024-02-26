@@ -31,6 +31,8 @@ config_workloads_deps_commands = ["pip install sklearn torch torchvision fileloc
 # config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 # config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
+config_custom_ray_wheel_s3_commands = ["pip3 install boto3", "cd ~ && git clone https://github.com/HPC-cloud-burst-with-ray/host-ray-wheel-asset.git ~/host-ray-wheel-asset"]
+
 remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
 shutdown_all_processes_commands = ["ray stop", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
@@ -276,7 +278,13 @@ def setup_custom_ray_wheel(cluster_info, custom_ray_wheel):
         time.sleep(15)
     elif custom_ray_wheel.startswith("s3"):
         # download from s3, will support later
-        raise Exception("S3 download not supported yet")
+        run_commands_ssh(login_node_ip, login_node_user, config_custom_ray_wheel_s3_commands)
+        run_commands_ssh(cloud_node_ip, cloud_node_user, config_custom_ray_wheel_s3_commands)
+        download_s3_command_login = f"cd ~/host-ray-wheel-asset && python3 download_s3.py {custom_ray_wheel} {login_node_share_dir}"
+        download_s3_command_cloud = f"cd ~/host-ray-wheel-asset && python3 download_s3.py {custom_ray_wheel} {login_node_share_dir}"
+        run_commands_ssh(login_node_ip, login_node_user, [download_s3_command_login])
+        run_commands_ssh(cloud_node_ip, cloud_node_user, [download_s3_command_cloud])
+        time.sleep(15)
     # begin to install by ray wheel
     force_reinstall_flag = " "
     run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
