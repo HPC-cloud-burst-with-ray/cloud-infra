@@ -86,7 +86,7 @@ export class OnPremStack extends Stack {
         cpuType: cpuType,
         instanceSize: instanceSize,
         nodeType: 'ONPREM_WORKER',
-        diskSize: 15,
+        diskSize: 25,
       });
       workerNodesArray.push(workerNode);
     }
@@ -105,9 +105,9 @@ export class OnPremStack extends Stack {
     // fileSystem.connections.allowDefaultPortFrom(loginNode.instance);
     // fileSystem.connections.allowDefaultPortFrom(workerNode.instance);
 
-    // give role to login node to do ssm:putParameter
+    // give role to login node to do ssm:putParameter and s3 ops
     loginNode.instance.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ssm:PutParameter'],
+      actions: ['ssm:PutParameter', 's3:GetObject', 's3:ListBucket', 's3:PutObject', 's3:DeleteObject'],
       resources: ['*'],
     }));
 

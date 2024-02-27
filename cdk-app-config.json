@@ -7,7 +7,7 @@
     },
 
     "dev": {
-        "INSTANCE_SIZE": "XLARGE"
+        "INSTANCE_SIZE": "XLARGE4"
     },
 
     "cloud": {

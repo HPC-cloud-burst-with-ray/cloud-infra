@@ -4,6 +4,7 @@ import { DevVpcResources } from './vpc';
 import { EC2NodeResources } from './ec2';
 import { EC2StackProps } from './utils';
 import { assert } from 'console';
+import { aws_iam as iam } from 'aws-cdk-lib';
 
 export class DevStack extends Stack {
   constructor(scope: Construct, id: string, props: EC2StackProps) {
@@ -30,6 +31,11 @@ export class DevStack extends Stack {
         nodeType: 'CLOUD',
         diskSize: 50,
     });
+
+    devNode.instance.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['ssm:PutParameter', 's3:GetObject', 's3:ListBucket', 's3:PutObject', 's3:DeleteObject'],
+      resources: ['*'],
+    }));
 
     devNode.instance.userData.addCommands(
         "yum groupinstall -y 'Development Tools' ",

@@ -31,7 +31,7 @@ config_workloads_deps_commands = ["pip install sklearn torch torchvision fileloc
 # config_rayenv_cloud_nodes = ["pip3 install sshuttle", "pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 # config_rayenv_onprem_nodes = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
-config_custom_ray_wheel_s3_commands = ["pip3 install boto3", "cd ~ && git clone https://github.com/HPC-cloud-burst-with-ray/host-ray-wheel-asset.git ~/host-ray-wheel-asset"]
+config_custom_ray_wheel_s3_commands = ["pip3 install boto3", "rm -rf ~/host-ray-wheel-asset && cd ~ && git clone https://github.com/HPC-cloud-burst-with-ray/host-ray-wheel-asset.git ~/host-ray-wheel-asset"]
 
 remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
