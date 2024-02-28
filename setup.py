@@ -504,6 +504,14 @@ def setup_ray_processes(cluster_info, skip_mirror):
         print("Num GPU on cloud worker node: " + str(num_gpu_cloud_worker))
         ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_cloud_worker} --num-gpus {num_gpu_cloud_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
         ray_cloud_worker_commands.append(ray_cloud_worker_command)
+    # set environment variable for ray: HEAD_NODE_IP = login node private ip
+    check_bashrc_command = f"grep -q 'HEAD_NODE_IP' ~/.bashrc || echo 'export HEAD_NODE_IP={login_node_private_ip}' >> ~/.bashrc"
+    # try to save this environment variable to ~/.bashrc if not already there
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", [check_bashrc_command, "source ~/.bashrc"])
+    # for node in onprem_worker_nodes:
+    #     run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", [check_bashrc_command])
+    # for node in cloud_nodes:
+    #     run_commands_ssh(node["PublicIp"], "ec2-user", [check_bashrc_command])
     # start to close all previous ray processes
     run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
     for node in onprem_worker_nodes:
