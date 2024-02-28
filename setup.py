@@ -447,7 +447,8 @@ def destroy_tc_network_emulator(cluster_info, node_name_map, netem):
             login_node = node
     for node_name, commands in commands_map.items():
         node = node_name_map[node_name]
-        if node.get("PublicIp") is not None:
+        print("Running tc commands for node: " + node_name)
+        if node.get("PublicIp") is not None and node.get("PublicIp") != "":
             run_commands_ssh(node["PublicIp"], "ec2-user", commands)
             # print("commands for node: " + node["Name"])
         else:
@@ -549,6 +550,8 @@ def setup_ray_processes(cluster_info, skip_mirror):
 # ssh options
 @click.option('--skip-config-ssh', is_flag=True, default=False, help='skip configuring ssh, because they are already configured')
 @click.option('--extra-ssh-keys', default="extra-ssh-keys.json", help='add ssh key to login node and worker nodes by json file')
+# specify network topology file path
+@click.option('--network-topology', default="network_topology.json", help='network topology file path for tc netem configuration')
 # environment options, whether to install, remove or use custom wheel
 @click.option('--remove-existing-ray', is_flag=True, default=False, help='remove existing ray installation')
 @click.option('--install-all-deps', is_flag=True, default=False, help='install official ray, sshuttle, watchman, mirror and other dependencies')
@@ -562,7 +565,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
 # run ray start commands
 @click.option('--run-ray', is_flag=True, default=False, help='configure sshuttle and run ray commands')
 @click.option('--shutdown', is_flag=True, default=False, help='shutdown all nodes ray processes and networking processes')
-def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, install_all_deps, custom_ray_wheel, install_workload_deps, run_sshuttle, skip_mirror, run_tc_netem, run_ray, shutdown):
+def main(cluster_config, skip_config_ssh, extra_ssh_keys, network_topology, remove_existing_ray, install_all_deps, custom_ray_wheel, install_workload_deps, run_sshuttle, skip_mirror, run_tc_netem, run_ray, shutdown):
     print('Using cluster config file: ' + cluster_config)
     ray_config = None
     with open(cluster_config) as f:
@@ -639,9 +642,9 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
     if run_tc_netem:
         print("Running tc netem on cloud nodes and HPC nodes to simulate network conditions")
         try:
-            netem = NetworkEmulator("network_topology_no_sshuttle.json")
+            netem = NetworkEmulator(network_topology)
         except Exception as e:
-            print("Failed to read default network topology file: ./network_topology_no_sshuttle.json")
+            print(f"Failed to read default network topology file: {network_topology}")
             print(e)
             return
         setup_tc_network_emulator(cluster_info, node_name_map, netem)
@@ -659,10 +662,10 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, remove_existing_ray, i
                 run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
         print("Closing all network emulation by tc")
         try:
-            netem = NetworkEmulator("network_topology_no_sshuttle.json")
+            netem = NetworkEmulator(network_topology)
             destroy_tc_network_emulator(cluster_info, node_name_map, netem)
         except Exception as e:
-            print("Failed to read default network topology file: ./network_topology_no_sshuttle.json")
+            print(f"Failed to read default network topology file: {network_topology}")
             print(e)
             return
         print("Finished shutting down all nodes ray processes and networking processes! Bye~")
