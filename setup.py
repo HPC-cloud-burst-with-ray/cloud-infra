@@ -551,7 +551,9 @@ def setup_ray_processes(cluster_info, skip_mirror):
     max_worker_port = 30090
     # num_cpus = 2
     # num_gpus = 0
-    num_cpu_head = get_num_cpus(login_node)
+    # test what if we don't run workloads in head node, set num_cpus to 1 (one process for shceduler)
+    # num_cpu_head = get_num_cpus(login_node)
+    num_cpu_head = 1
     num_gpu_head = get_num_gpus(login_node)
     print("Num CPU on login node: " + str(num_cpu_head))
     print("Num GPU on login node: " + str(get_num_gpus(login_node)))
