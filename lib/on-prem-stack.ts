@@ -86,7 +86,7 @@ export class OnPremStack extends Stack {
         cpuType: cpuType,
         instanceSize: instanceSize,
         nodeType: 'ONPREM_WORKER',
-        diskSize: 25,
+        diskSize: 150,
       });
       workerNodesArray.push(workerNode);
     }

@@ -64,7 +64,7 @@ export class CloudStack extends Stack {
         cpuType: cpuType,
         instanceSize: instanceSize,
         nodeType: 'CLOUD',
-        diskSize: 25,
+        diskSize: 150,
       }));
     }
 
