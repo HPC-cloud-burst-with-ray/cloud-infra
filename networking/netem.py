@@ -51,7 +51,7 @@ class NetworkEmulator(NetworkTopology):
             # f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} --tcp-flags ALL ACK -j RETURN",
             f"sudo tc qdisc add dev {device} root handle {qdisc_handle}: prio",
             f"sudo tc qdisc add dev {device} parent {qdisc_handle}:3 handle {netem_handle}: netem delay {rtt[0]/2}ms {rtt[1]/2}ms",
-            f"sudo tc qdisc add dev {device} parent {netem_handle}:1 handle {tbf_handle}: tbf rate {bandwidth[0]}mbit burst 32kbit latency 10ms",
+            f"sudo tc qdisc add dev {device} parent {netem_handle}:1 handle {tbf_handle}: tbf rate {bandwidth[0]}mbit burst 256kbit latency 30ms",
             f"sudo tc filter add dev {device} protocol ip parent {qdisc_handle}:0 prio 3 handle {mask} fw flowid {qdisc_handle}:3"
         ]
         return commands
@@ -118,6 +118,17 @@ if __name__ == "__main__":
     netem.add_edge("HPCLogin", "Cloud", NetworkCondition(rtt=(20, 0), bandwidth=(6, 0), jitter=(0.1, 0), loss=(0, 0)))
     netem.add_edge("HPCWorker", "Cloud", NetworkCondition(rtt=(20, 0), bandwidth=(6, 0), jitter=(0.1, 0), loss=(0, 0)))
     netem.export_to_json("network_topology_sshuttle_ray.json")
+
+    netem = NetworkEmulator()
+    netem.add_edge("HPCLogin", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(900, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCWorker", "HPCLogin", NetworkCondition(rtt=(0.3, 0), bandwidth=(900, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCWorker", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(900, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("Cloud", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(5000, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("Cloud", "HPCLogin", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("Cloud", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCLogin", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCWorker", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.export_to_json("network_topology_test_case.json")
 
     # read topology file and test command generation
     netem = NetworkEmulator("network_topology_no_sshuttle.json")
