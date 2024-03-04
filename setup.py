@@ -553,7 +553,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
     # num_gpus = 0
     # test what if we don't run workloads in head node, set num_cpus to 1 (one process for shceduler)
     # num_cpu_head = get_num_cpus(login_node)
-    num_cpu_head = 1
+    num_cpu_head = 2
     num_gpu_head = get_num_gpus(login_node)
     print("Num CPU on login node: " + str(num_cpu_head))
     print("Num GPU on login node: " + str(get_num_gpus(login_node)))
@@ -729,14 +729,6 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, network_topology, remo
         print("Running ray commands on all nodes")
         setup_ray_processes(cluster_info, skip_mirror)
     if shutdown:
-        print("Shutting down all nodes ray processes and networking processes")
-        for node in cloud_ec2_info:
-            run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
-        for node in on_prem_ec2_info:
-            if not node["LoginNode"]:
-                run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", shutdown_all_processes_commands)
-            else:
-                run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
         print("Closing all network emulation by tc")
         try:
             netem = NetworkEmulator(network_topology)
@@ -745,6 +737,14 @@ def main(cluster_config, skip_config_ssh, extra_ssh_keys, network_topology, remo
             print(f"Failed to read default network topology file: {network_topology}")
             print(e)
             return
+        print("Shutting down all nodes ray processes and networking processes")
+        for node in cloud_ec2_info:
+            run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
+        for node in on_prem_ec2_info:
+            if not node["LoginNode"]:
+                run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", shutdown_all_processes_commands)
+            else:
+                run_commands_ssh(node["PublicIp"], "ec2-user", shutdown_all_processes_commands)
         print("Finished shutting down all nodes ray processes and networking processes! Bye~")
 
 if __name__ == '__main__':

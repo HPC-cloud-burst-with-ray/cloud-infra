@@ -46,12 +46,15 @@ class NetworkEmulator(NetworkTopology):
         bandwidth = network_condition.bandwidth
         rtt = network_condition.rtt
         commands = [
+            # tune up network max buffer size
+            f"sudo sysctl -w net.core.rmem_max=25000000",
+            f"sudo sysctl -w net.core.wmem_max=25000000",
             # f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} -j MARK --set-mark 1",
             f"sudo iptables -t mangle -A OUTPUT -d {target_ip} -j MARK --set-mark {mask}",
             # f"sudo iptables -t mangle -A OUTPUT -p tcp -d {target_ip} --tcp-flags ALL ACK -j RETURN",
             f"sudo tc qdisc add dev {device} root handle {qdisc_handle}: prio",
             f"sudo tc qdisc add dev {device} parent {qdisc_handle}:3 handle {netem_handle}: netem delay {rtt[0]/2}ms {rtt[1]/2}ms",
-            f"sudo tc qdisc add dev {device} parent {netem_handle}:1 handle {tbf_handle}: tbf rate {bandwidth[0]}mbit burst 256kbit latency 30ms",
+            f"sudo tc qdisc add dev {device} parent {netem_handle}:1 handle {tbf_handle}: tbf rate {bandwidth[0]}mbit burst 1024kbit latency 30ms",
             f"sudo tc filter add dev {device} protocol ip parent {qdisc_handle}:0 prio 3 handle {mask} fw flowid {qdisc_handle}:3"
         ]
         return commands
