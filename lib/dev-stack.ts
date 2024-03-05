@@ -33,7 +33,7 @@ export class DevStack extends Stack {
     });
 
     devNode.instance.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ssm:PutParameter', 's3:GetObject', 's3:ListBucket', 's3:PutObject', 's3:DeleteObject'],
+      actions: ['ssm:PutParameter', 's3:*'],
       resources: ['*'],
     }));
 

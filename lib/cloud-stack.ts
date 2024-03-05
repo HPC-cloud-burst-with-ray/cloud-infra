@@ -133,7 +133,7 @@ export class CloudStack extends Stack {
     // add putPrarams and also s3 ops to all the cloud node instance iam policy
     for (let i = 0; i < workerNodeNum; i++) {
       cloudNodesArray[i].instance.addToRolePolicy(new iam.PolicyStatement({
-        actions: ['ssm:PutParameter', 's3:GetObject', 's3:ListBucket', 's3:PutObject', 's3:DeleteObject'],
+        actions: ['ssm:PutParameter', 's3:*'],
         resources: ['*'],
       }));
     }

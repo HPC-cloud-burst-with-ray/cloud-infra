@@ -107,9 +107,17 @@ export class OnPremStack extends Stack {
 
     // give role to login node to do ssm:putParameter and s3 ops
     loginNode.instance.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ssm:PutParameter', 's3:GetObject', 's3:ListBucket', 's3:PutObject', 's3:DeleteObject'],
+      actions: ['ssm:PutParameter', 's3:*'],
       resources: ['*'],
     }));
+
+    // give role to worker node to do ssm:putParameter and s3 ops
+    for (let i = 0; i < workerNodeNum; i++) {
+      workerNodesArray[i].instance.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['ssm:PutParameter', 's3:*'],
+        resources: ['*'],
+      }));
+    }
 
     // mounting efs on login node
     // setup ssh key for login node
