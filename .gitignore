@@ -8,3 +8,4 @@ dist
 .cdk.staging
 cdk.out
 *.DS_Store
+*__pycache__*

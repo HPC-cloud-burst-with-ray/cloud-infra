@@ -19,6 +19,10 @@
       {
         "name": "TingkaiMac",
         "key": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDafrAumyO8eWHMekfIRLXRj5fI6nvSXzVgPLc2YsMNARATtjn4GECc97f7lc1imFVJNPMYfa6n7F4Mc0cAmLOcJu+yUTtOo/8AwLzcUWGnHnkTxxEs/czU0B7KCKkr2xAdIZ+4CfBMfaJnUWzuAd21G83CPOqRauq1P9SiGGl3P+la0HAXOEhWUjwj+wyaI3Rpegmgu4YW6CHjsMW64cHE68bowdkROxhP53KMWJso/ZOYXNoH8LiiEjnD1lUL04lVt+Xyw2jw+TPeCgynzWw8Na6Xsi0AD8jVVQ6gjo/uTXuqV9BvPvrhsJanjeBuxsfsWillenpoNxIv57XejR6a46KyQvtj3pPhMQrzTzszSTi+JcCm0h/WjEY9tatLG5Pmpi2imnwLsRDom828q0GB0U6wOk7VQ1qLP8U46LjK51Y9PE0CaS4J/TxmkOFq+7LSJ9l1vjz1mb8tRgdlQ6k07k5eKZcKfqlKCHDoZIwy37y0sxr6ITDmBoWg6VGfx70= ltkpony@wirelessprv-10-194-196-182.near.illinois.edu"
+      },
+      {
+        "name": "HuiliWindowsPC",
+        "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP2hkCX0JJhKgMNb2KILsP/SnXi7VwXfSHqF6vLoeeqq huili@hyoer"
       }
     ]
   }
