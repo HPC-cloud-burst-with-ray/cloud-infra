@@ -12,6 +12,10 @@ from networking.netem import CLOUD, HPC_LOGIN, HPC_WORKER
 # pip3 install ray[client]
 # pip3 install ray[default]
 
+LOCAL_NODE_TYPE_ONPREM_LOGIN = 0
+LOCAL_NODE_TYPE_ONPREM_WORKER = 1
+LOCAL_NODE_TYPE_CLOUD = 2
+
 config_watchman_amz_linux_commands = [
     "cd ~ && [ ! -d 'watchman-amazonlinux-problems' ] && git clone https://github.com/marc-guenther/watchman-amazonlinux-problems.git",
     "cd ~/watchman-amazonlinux-problems/watchman && chmod 755 watchman* && sudo mkdir -p /usr/local/bin && sudo cp ./* /usr/local/bin",
@@ -583,13 +587,19 @@ def setup_ray_processes(cluster_info, skip_mirror):
         ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_cloud_worker} --num-gpus {num_gpu_cloud_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
         ray_cloud_worker_commands.append(ray_cloud_worker_command)
     # set environment variable for ray: HEAD_NODE_IP = login node private ip
-    check_bashrc_command = f"grep -q 'HEAD_NODE_IP' ~/.bashrc || echo 'export HEAD_NODE_IP={login_node_private_ip}' >> ~/.bashrc"
+    set_head_ip_bashrc_command = f"grep -q 'HEAD_NODE_IP' ~/.bashrc || echo 'export HEAD_NODE_IP={login_node_private_ip}' >> ~/.bashrc"
+    set_local_node_onprem_login_bashrc_command = f"grep -q 'LOCAL_NODE_TYPE' ~/.bashrc || echo 'export LOCAL_NODE_TYPE={LOCAL_NODE_TYPE_ONPREM_LOGIN}' >> ~/.bashrc"
+    set_local_node_onprem_worker_bashrc_command = f"grep -q 'LOCAL_NODE_TYPE' ~/.bashrc || echo 'export LOCAL_NODE_TYPE={LOCAL_NODE_TYPE_ONPREM_WORKER}' >> ~/.bashrc"
+    set_local_node_cloud_bashrc_command = f"grep -q 'LOCAL_NODE_TYPE' ~/.bashrc || echo 'export LOCAL_NODE_TYPE={LOCAL_NODE_TYPE_CLOUD}' >> ~/.bashrc"
+    set_login_bashrc_commands = [set_head_ip_bashrc_command, set_local_node_onprem_login_bashrc_command, "source ~/.bashrc"]
+    set_onprem_worker_bashrc_commands = [set_local_node_onprem_worker_bashrc_command, "source ~/.bashrc"]
+    set_cloud_bashrc_commands = [set_local_node_cloud_bashrc_command, "source ~/.bashrc"]
     # try to save this environment variable to ~/.bashrc if not already there
-    run_commands_ssh(login_node["PublicIp"], "ec2-user", [check_bashrc_command, "source ~/.bashrc"])
-    # for node in onprem_worker_nodes:
-    #     run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", [check_bashrc_command])
-    # for node in cloud_nodes:
-    #     run_commands_ssh(node["PublicIp"], "ec2-user", [check_bashrc_command])
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", set_login_bashrc_commands)
+    for node in onprem_worker_nodes:
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", set_onprem_worker_bashrc_commands)
+    for node in cloud_nodes:
+        run_commands_ssh(node["PublicIp"], "ec2-user", set_cloud_bashrc_commands)
     # start to close all previous ray processes
     run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
     for node in onprem_worker_nodes:
