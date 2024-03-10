@@ -84,6 +84,8 @@ export class EC2NodeResources extends Construct{
             'yum install -y java-1.8.0-amazon-corretto-devel',
             'yum install -y iproute-tc iperf3',
             "yum install p7zip p7zip-plugins -y",
+            "yum groupinstall -y 'Development Tools' ",
+            "yum install -y psmisc",
         );
     
         // determine cpu and instance size

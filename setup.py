@@ -139,8 +139,10 @@ def run_commands_ssh(node_ip, user_name, commands):
             stdin, stdout, stderr = ssh.exec_command(command)
             command_output = stdout.read()
             return_output.append(command_output)
-            print(command_output)
-            print(stderr.read())
+            print(command_output.decode("utf-8"))
+            # print(stderr.read())
+            err_output = stderr.read()
+            print(err_output.decode("utf-8"))
     except Exception as e:
         print("SSH into node: " + node_ip + " failed")
         print(e)
@@ -163,8 +165,10 @@ def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, co
             stdin, stdout, stderr = ssh.exec_command(f"ssh -o StrictHostKeyChecking=no {user_name}@{node_ip} \"{command}\" ")
             command_output = stdout.read()
             return_output.append(command_output)
-            print(command_output)
-            print(stderr.read())
+            print(command_output.decode("utf-8"))
+            # print(stderr.read())
+            err_output = stderr.read()
+            print(err_output.decode("utf-8"))
     except Exception as e:
         print("SSH into login node: " + login_ip + " failed")
         print(e)
@@ -271,7 +275,7 @@ def setup_ssh_auth_keys(cluster_info, extra_ssh_keys_list):
         print("No DevNodesInfo found in cluster_info")
 
 
-def install_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_nodes, custom_ray_wheel):
+def download_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_nodes, custom_ray_wheel):
     # will use the wheel file to overwrite the default installed ray
     # check if URL is http or s3
     # http example: http://23.21.12.11:8888/ray-3.0.0.dev0-cp310-cp310-linux_x86_64.whl
@@ -303,11 +307,14 @@ def install_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_nodes
         time.sleep(15)
     # begin to install by ray wheel
     force_reinstall_flag = " "
-    run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
-    for node in onprem_worker_nodes:
-        run_commands_ssh_via_login(login_node_ip, login_node_user, node["PrivateIp"], "ec2-user", [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
-    for node in cloud_worker_nodes:
-        run_commands_ssh(node["PublicIp"], "ec2-user", [f"cd {cloud_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    # run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    # for node in onprem_worker_nodes:
+    #     run_commands_ssh_via_login(login_node_ip, login_node_user, node["PrivateIp"], "ec2-user", [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    # for node in cloud_worker_nodes:
+    #     run_commands_ssh(node["PublicIp"], "ec2-user", [f"cd {cloud_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"])
+    onprem_node_config_commands = [f"cd {login_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"]
+    cloud_node_config_commands = [f"cd {cloud_node_share_dir} && pip3 install {force_reinstall_flag} ./{filename}"]
+    return onprem_node_config_commands, cloud_node_config_commands
 
 def check_and_config_conda(node, login_node):
     need_to_config_conda = False
@@ -321,9 +328,6 @@ def check_and_config_conda(node, login_node):
             need_to_config_conda = True
     if need_to_config_conda:
         print("Need to configure conda for node: " + node["Name"])
-        # transfer the local add_to_bashrc.txt to remote nodes
-        if not os.path.exists("add_to_bashrc.txt"):
-            raise Exception("add_to_bashrc.txt not found")
         if login_node is None:
             run_commands_ssh(node["PublicIp"], "ec2-user", config_anaconda_commands)
             run_commands_ssh(node["PublicIp"], "ec2-user", config_python310_conda_commands)
@@ -364,19 +368,20 @@ def setup_software_deps(cluster_info, remove_existing_ray, install_all_deps, cus
     config_mirror_all_commands = config_watchman_amz_linux_commands + config_mirror_commands
     config_code_repos_commands = config_ray_workloads_repo_commands + config_ray_custom_scheduler_commands
     config_workloads_all_deps_commands = config_mirror_all_commands + config_workloads_deps_commands
-    config_rayenv_commands = []
+    config_rayenv_commands = config_official_rayenv_commands
+    onprem_custom_ray_commands = []
+    cloud_custom_ray_commands = []
     patch_fastapi_pydantic_versions = config_workloads_deps_conflict_commands
     use_official_ray = custom_ray_wheel == ""
     if use_official_ray:
-        config_rayenv_commands = config_official_rayenv_commands
         if install_all_deps:
             patch_fastapi_pydantic_versions = []
     else:
         # setup by wheel
-        install_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_nodes, custom_ray_wheel)
+        onprem_custom_ray_commands, cloud_custom_ray_commands = download_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_nodes, custom_ray_wheel)
     if install_all_deps:
-        config_commands_onprem = config_rayenv_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
-        config_commands_cloud = config_sshuttle_commands + config_rayenv_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
+        config_commands_onprem = config_rayenv_commands + onprem_custom_ray_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
+        config_commands_cloud = config_sshuttle_commands + config_rayenv_commands + cloud_custom_ray_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
     elif install_workload_deps:
         config_commands_onprem = config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
         config_commands_cloud = config_sshuttle_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
