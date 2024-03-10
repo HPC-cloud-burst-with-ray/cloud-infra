@@ -55,8 +55,7 @@ config_sshuttle_commands = ["pip3 install sshuttle"]
 
 config_official_rayenv_commands = ["pip3 install ray", "pip3 install ray[client]", "pip3 install ray[default]"]
 
-# config_workloads_deps_commands = ["pip install sklearn torch torchvision filelock statsforecast pandas pyarrow aiorwlock requests Pillow boto3"]
-config_workloads_deps_commands = ["pip install torch torchvision pandas pycocotools",
+config_workloads_deps_commands = ["pip install torch torchvision pandas pycocotools boto3",
                                   "pip install filelock statsforecast pyarrow requests",
                                   "pip install Pillow aiorwlock uvicorn plotly grpcio"]
 
