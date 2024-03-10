@@ -70,7 +70,7 @@ config_custom_ray_wheel_s3_commands = ["pip install boto3",
 
 remove_existing_ray_commands = ["pip3 uninstall -y ray"]
 
-shutdown_all_processes_commands = ["ray stop", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
+shutdown_all_processes_commands = ["ray stop --force", '''tmux list-sessions | awk -F: '{print $1}' | xargs -I {} tmux kill-session -t {} ''']
 
 
 def get_num_cpus(instance_info):
@@ -615,8 +615,8 @@ def setup_ray_processes(cluster_info, skip_mirror):
     set_local_node_onprem_worker_bashrc_command = f"grep -q 'LOCAL_NODE_TYPE' ~/.bashrc || echo 'export LOCAL_NODE_TYPE={LOCAL_NODE_TYPE_ONPREM_WORKER}' >> ~/.bashrc"
     set_local_node_cloud_bashrc_command = f"grep -q 'LOCAL_NODE_TYPE' ~/.bashrc || echo 'export LOCAL_NODE_TYPE={LOCAL_NODE_TYPE_CLOUD}' >> ~/.bashrc"
     set_login_bashrc_commands = [set_head_ip_bashrc_command, set_local_node_onprem_login_bashrc_command, "source ~/.bashrc"]
-    set_onprem_worker_bashrc_commands = [set_local_node_onprem_worker_bashrc_command, "source ~/.bashrc"]
-    set_cloud_bashrc_commands = [set_local_node_cloud_bashrc_command, "source ~/.bashrc"]
+    set_onprem_worker_bashrc_commands = [set_head_ip_bashrc_command, set_local_node_onprem_worker_bashrc_command, "source ~/.bashrc"]
+    set_cloud_bashrc_commands = [set_head_ip_bashrc_command, set_local_node_cloud_bashrc_command, "source ~/.bashrc"]
     # try to save this environment variable to ~/.bashrc if not already there
     run_commands_ssh(login_node["PublicIp"], "ec2-user", set_login_bashrc_commands)
     for node in onprem_worker_nodes:
@@ -624,11 +624,11 @@ def setup_ray_processes(cluster_info, skip_mirror):
     for node in cloud_nodes:
         run_commands_ssh(node["PublicIp"], "ec2-user", set_cloud_bashrc_commands)
     # start to close all previous ray processes
-    run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop"])
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", ["ray stop --force"])
     for node in onprem_worker_nodes:
-        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", ["ray stop"])
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", ["ray stop --force"])
     for node in cloud_nodes:
-        run_commands_ssh(node["PublicIp"], "ec2-user", ["ray stop"])
+        run_commands_ssh(node["PublicIp"], "ec2-user", ["ray stop --force"])
     # start new ray processes
     run_commands_ssh(login_node["PublicIp"], "ec2-user", [ray_command_head])
     for i in range(len(onprem_worker_nodes)):
