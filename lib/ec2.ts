@@ -83,6 +83,7 @@ export class EC2NodeResources extends Construct{
             'ln -s /usr/bin/python3 /usr/bin/python',
             'yum install -y java-1.8.0-amazon-corretto-devel',
             'yum install -y iproute-tc iperf3',
+            "yum install p7zip p7zip-plugins -y",
         );
     
         // determine cpu and instance size
@@ -93,8 +94,9 @@ export class EC2NodeResources extends Construct{
             throw new Error('Unsupported cpu type');
         }
 
-        // determine instance class (C5 or M5 for example, default to M5 to save cost)
-        instanceClass = InstanceClass.C5;
+        // determine instance class (C5, R5 or M5 for example, default to M5 to save cost)
+        // instanceClass = InstanceClass.C5;
+        instanceClass = InstanceClass.R5;
 
         switch (props.instanceSize) {
             case 'LARGE':

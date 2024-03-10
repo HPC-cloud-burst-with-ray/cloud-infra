@@ -3,7 +3,7 @@ import boto3
 import json
 import paramiko
 import time
-
+import os
 from networking.netem import NetworkEmulator
 from networking.netem import CLOUD, HPC_LOGIN, HPC_WORKER
 
@@ -21,6 +21,15 @@ config_watchman_amz_linux_commands = [
     "cd ~/watchman-amazonlinux-problems/watchman && chmod 755 watchman* && sudo mkdir -p /usr/local/bin && sudo cp ./* /usr/local/bin",
 ]
 
+config_ray_workloads_repo_commands = [
+    "cd ~/share && [ ! -d 'Ray-Workloads' ] && git clone https://github.com/HPC-cloud-burst-with-ray/Ray-Workloads.git",
+]
+
+config_ray_custom_scheduler_commands = [
+    "cd ~ && [ ! -d 'ray' ] && git clone https://github.com/hyoer0423/ray.git",
+    "cd ~/ray && git checkout protbuf",
+]
+
 config_mirror_commands = [
     "wget https://github.com/stephenh/mirror/releases/latest/download/mirror-all.jar -O ~/mirror-all.jar",
     "wget https://github.com/stephenh/mirror/releases/latest/download/mirror -O ~/mirror",
@@ -33,7 +42,8 @@ config_anaconda_commands = ["cd ~ && curl -O https://repo.anaconda.com/archive/A
                             # install with default and yes, add to bashrc,
                             "cd ~ && bash ~/Anaconda3-2023.09-0-Linux-x86_64.sh -b -p ~/anaconda3",
                             # init conda and add to bashrc
-                            '''echo 'eval "$(~/anaconda3/bin/conda shell.bash hook)"' >> ~/.bashrc''',
+                            "cd ~ && [ ! -d 'setup_bashrc' ] && git clone https://github.com/HPC-cloud-burst-with-ray/setup_bashrc.git",
+                            "cd ~/setup_bashrc && cat add_to_bashrc.txt >> ~/.bashrc",
                             "source ~/.bashrc",
                             ]
 
@@ -311,6 +321,9 @@ def check_and_config_conda(node, login_node):
             need_to_config_conda = True
     if need_to_config_conda:
         print("Need to configure conda for node: " + node["Name"])
+        # transfer the local add_to_bashrc.txt to remote nodes
+        if not os.path.exists("add_to_bashrc.txt"):
+            raise Exception("add_to_bashrc.txt not found")
         if login_node is None:
             run_commands_ssh(node["PublicIp"], "ec2-user", config_anaconda_commands)
             run_commands_ssh(node["PublicIp"], "ec2-user", config_python310_conda_commands)
@@ -349,6 +362,7 @@ def setup_software_deps(cluster_info, remove_existing_ray, install_all_deps, cus
     config_commands_onprem = []
     config_commands_cloud = []
     config_mirror_all_commands = config_watchman_amz_linux_commands + config_mirror_commands
+    config_code_repos_commands = config_ray_workloads_repo_commands + config_ray_custom_scheduler_commands
     config_workloads_all_deps_commands = config_mirror_all_commands + config_workloads_deps_commands
     config_rayenv_commands = []
     patch_fastapi_pydantic_versions = config_workloads_deps_conflict_commands
@@ -366,9 +380,13 @@ def setup_software_deps(cluster_info, remove_existing_ray, install_all_deps, cus
     elif install_workload_deps:
         config_commands_onprem = config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
         config_commands_cloud = config_sshuttle_commands + config_workloads_all_deps_commands + patch_fastapi_pydantic_versions
-    run_commands_ssh(login_node["PublicIp"], "ec2-user", config_commands_onprem)
+    run_commands_ssh(login_node["PublicIp"], "ec2-user", config_commands_onprem + config_code_repos_commands)
+    cloud_node_idx = 0
     for node in cloud_worker_nodes:
         run_commands_ssh(node["PublicIp"], "ec2-user", config_commands_cloud)
+        if cloud_node_idx == 0:
+            run_commands_ssh(node["PublicIp"], "ec2-user", config_ray_workloads_repo_commands)
+        cloud_node_idx += 1
     # configure ray environment for all nodes
     for node in onprem_worker_nodes:
         run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", config_commands_onprem)

@@ -1,7 +1,11 @@
 import paramiko
 
 
-check_conda_python310_commands = ["conda --version &> /dev/null && conda env list | grep -q 'myenv' || echo 'FAILED to find conda myenv' "]
+# check_conda_python310_commands = ["conda --version &> /dev/null && conda env list | grep -q 'myenv' || echo 'FAILED to find conda myenv' "]
+
+config_conda_commands = ["cd ~ && [ ! -d 'setup_bashrc' ] && git clone https://github.com/HPC-cloud-burst-with-ray/setup_bashrc.git",
+                            "cd ~/setup_bashrc && cat add_to_bashrc.txt >> ~/.bashrc",]
+
 
 def run_commands_ssh(node_ip, user_name, commands):
     if len(commands) == 0:
@@ -53,17 +57,11 @@ def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, co
 
 if __name__ == "__main__":
     # run commands on remote node
-    node_ip = "34.228.78.134"
+    node_ip = "18.215.159.135"
     user_name = "ec2-user"
-    worker_ip = "10.0.1.64"
+    worker_ip = "10.0.1.214"
     worker_user_name = "ec2-user"
-    commands = check_conda_python310_commands
-    ret = run_commands_ssh(node_ip, user_name, commands)
-    # if "FAILED" in ret[0].decode('utf-8'):
-    #     print("[RETURN] Conda environment myenv not found")
-    ret = run_commands_ssh_via_login(node_ip, user_name, worker_ip, worker_user_name, commands)
-    if "FAILED" in ret[0].decode('utf-8'):
-        print("[RETURN] Conda environment myenv not found")
-    else:
-        print("[RETURN] Conda environment myenv found")
+    commands = config_conda_commands
+    # run_commands_ssh(node_ip, user_name, commands)
+    run_commands_ssh_via_login(node_ip, user_name, worker_ip, worker_user_name, commands)
 
