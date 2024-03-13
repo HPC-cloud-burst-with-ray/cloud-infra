@@ -62,10 +62,4 @@ pip3 install boto3
 
 ## Environment 
 
-Add `.env` file with content like below.
-
-```
-SSH_PUB_KEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD3f1cYH4...
-CPU_TYPE=x86_64
-INSTANCE_SIZE=LARGE
-```
+Find more about setting up experiments, please refer to https://github.com/HPC-cloud-burst-with-ray/paper-reproduce 

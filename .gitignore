@@ -9,3 +9,5 @@ dist
 cdk.out
 *.DS_Store
 *__pycache__*
+*cluster.out.*
+*.zip
