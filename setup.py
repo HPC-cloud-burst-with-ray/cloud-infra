@@ -291,7 +291,7 @@ def download_custom_ray_wheel(login_node, onprem_worker_nodes, cloud_worker_node
     # filename
     filename = custom_ray_wheel.split('/')[-1]
     if custom_ray_wheel.startswith("http"):
-        curl_command = f"curl -o {filename} {custom_ray_wheel}"
+        curl_command = f"curl -L -O {custom_ray_wheel}"
         run_commands_ssh(login_node_ip, login_node_user, [f"cd {login_node_share_dir} && {curl_command}"])
         run_commands_ssh(cloud_node_ip, cloud_node_user, [f"cd {cloud_node_share_dir} && {curl_command}"])
         time.sleep(15)
