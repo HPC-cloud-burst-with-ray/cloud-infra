@@ -127,10 +127,10 @@ if __name__ == "__main__":
     netem.add_edge("HPCWorker", "HPCLogin", NetworkCondition(rtt=(0.3, 0), bandwidth=(900, 0), jitter=(0.01, 0), loss=(0, 0)))
     netem.add_edge("HPCWorker", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(900, 0), jitter=(0.01, 0), loss=(0, 0)))
     netem.add_edge("Cloud", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(5000, 0), jitter=(0.01, 0), loss=(0, 0)))
-    netem.add_edge("Cloud", "HPCLogin", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
-    netem.add_edge("Cloud", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
-    netem.add_edge("HPCLogin", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
-    netem.add_edge("HPCWorker", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(106, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("Cloud", "HPCLogin", NetworkCondition(rtt=(0.3, 0), bandwidth=(83, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("Cloud", "HPCWorker", NetworkCondition(rtt=(0.3, 0), bandwidth=(83, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCLogin", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(83, 0), jitter=(0.01, 0), loss=(0, 0)))
+    netem.add_edge("HPCWorker", "Cloud", NetworkCondition(rtt=(0.3, 0), bandwidth=(83, 0), jitter=(0.01, 0), loss=(0, 0)))
     netem.export_to_json("network_topology_test_case.json")
 
     # read topology file and test command generation
