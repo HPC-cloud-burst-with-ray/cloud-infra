@@ -1,9 +1,41 @@
 import subprocess
 import time
-
-head_node = "3.128.201.62"
-cloud_node = "3.12.146.140"
+import json
+# head_node = "3.128.201.62"
+# cloud_node = "3.12.146.140"
 timeout_duration = 60 * 15
+
+
+def get_ip():
+    # Open the JSON file
+    head_ip=''
+    cloud_ip=''
+    with open('cluster.out.json', 'r') as file:
+        # Load the JSON data
+        data = json.load(file)
+
+         # Retrieve directory information
+        
+        OnPremNodesInfo = data['OnPremNodesInfo']
+        for node in OnPremNodesInfo:
+            if node['PublicIp']!='':
+                head_ip=node['PublicIp']
+        CloudNodesInfo=data['CloudNodesInfo']
+        for node in CloudNodesInfo:
+            if node['PublicIp']!='':
+                cloud_ip=node['PublicIp']
+    return cloud_ip,head_ip
+
+cloud_node,head_node=get_ip()
+if head_node=='':
+    head_node = "3.128.201.62"
+if cloud_node=='':
+    cloud_node = "3.12.146.140"
+
+
+
+
+
 
 def run_cmd(cmd, is_blocking=True, print_output=False):
     # print("Running command: ", cmd)
