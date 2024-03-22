@@ -148,7 +148,7 @@ def run_commands_ssh(node_ip, user_name, commands):
     ssh.close()
     return return_output
 
-def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, commands):
+def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, commands, transfer_file=False):
     if len(commands) == 0:
         print("No commands to run")
         return
@@ -159,15 +159,37 @@ def run_commands_ssh_via_login(login_ip, login_user_name, node_ip, user_name, co
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(hostname=login_ip, username=login_user_name)
         print("SSH into login node: " + login_ip + " successfully")
-        for command in commands:
-            # execute commands on user_name@node_ip
-            stdin, stdout, stderr = ssh.exec_command(f"ssh -o StrictHostKeyChecking=no {user_name}@{node_ip} \"{command}\" ")
-            command_output = stdout.read()
-            return_output.append(command_output)
-            print(command_output.decode("utf-8"))
-            # print(stderr.read())
-            err_output = stderr.read()
-            print(err_output.decode("utf-8"))
+        if transfer_file:
+            # transfer commands as pure string to target node via login node  
+            command_id = 0
+            remote_file_path = "/tmp/" 
+            sftp = ssh.open_sftp()
+            for command in commands:
+                remote_file_name = f"ssh_command_{command_id}.sh"
+                remote_file = sftp.file(remote_file_path + remote_file_name, "w")
+                remote_file.write(command)
+                remote_file.close()
+                command_id += 1
+                # use scp to transfer file to target node
+                stdin, stdout, stderr = ssh.exec_command(f"scp -o StrictHostKeyChecking=no {remote_file_path + remote_file_name} {user_name}@{node_ip}:{remote_file_path}")
+                # then execute the file on target node
+                stdin, stdout, stderr = ssh.exec_command(f"ssh -o StrictHostKeyChecking=no {user_name}@{node_ip} \"bash  {remote_file_path + remote_file_name} \" ")
+                command_output = stdout.read()
+                return_output.append(command_output)
+                print(command_output.decode("utf-8"))
+                # print(stderr.read())
+                err_output = stderr.read()
+                print(err_output.decode("utf-8"))
+        else:
+            for command in commands:
+                # execute commands on user_name@node_ip
+                stdin, stdout, stderr = ssh.exec_command(f"ssh -o StrictHostKeyChecking=no {user_name}@{node_ip} \"{command}\" ")
+                command_output = stdout.read()
+                return_output.append(command_output)
+                print(command_output.decode("utf-8"))
+                # print(stderr.read())
+                err_output = stderr.read()
+                print(err_output.decode("utf-8"))
     except Exception as e:
         print("SSH into login node: " + login_ip + " failed")
         print(e)
@@ -589,6 +611,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
     ray_command_head = f"ray start --head --node-ip-address={login_node_private_ip} --port={gcs_port} --dashboard-port={dashboard_port} --num-cpus {num_cpu_head} --num-gpus {num_gpu_head}  --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
     head_address = f"{login_node_private_ip}:{gcs_port}"
     ray_onprem_worker_commands = []
+    # onprem side worker commands generation
     for i in range(len(onprem_worker_nodes)):
         node = onprem_worker_nodes[i]
         node_ip = node["PrivateIp"]
@@ -596,8 +619,12 @@ def setup_ray_processes(cluster_info, skip_mirror):
         num_gpu_onprem_worker = get_num_gpus(node)
         print("Num CPU on onprem worker node: " + str(num_cpu_onprem_worker))
         print("Num GPU on onprem worker node: " + str(num_gpu_onprem_worker))
-        ray_onprem_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_onprem_worker} --num-gpus {num_gpu_onprem_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        ray_onprem_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_onprem_worker} --num-gpus {num_gpu_onprem_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password} --resources=\'{{\"binding\":1}}\'"
+        # write this command to file and examine
+        with open("ray_onprem_worker_command.txt", "w") as file:
+            file.write(ray_onprem_worker_command)
         ray_onprem_worker_commands.append(ray_onprem_worker_command)
+    # cloud side worker commands generation
     ray_cloud_worker_commands = []
     for i in range(len(cloud_nodes)):
         node = cloud_nodes[i]
@@ -606,7 +633,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
         num_gpu_cloud_worker = get_num_gpus(node)
         print("Num CPU on cloud worker node: " + str(num_cpu_cloud_worker))
         print("Num GPU on cloud worker node: " + str(num_gpu_cloud_worker))
-        ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_cloud_worker} --num-gpus {num_gpu_cloud_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password}"
+        ray_cloud_worker_command = f"ray start --address {head_address} --node-ip-address={node_ip} --num-cpus {num_cpu_cloud_worker} --num-gpus {num_gpu_cloud_worker} --min-worker-port {min_worker_port} --max-worker-port {max_worker_port} --node-manager-port {node_manager_port} --object-manager-port {object_manager_port} --redis-password={redis_password} --resources=\'{{\"binding\":1}}\' "
         ray_cloud_worker_commands.append(ray_cloud_worker_command)
     # set environment variable for ray: HEAD_NODE_IP = login node private ip
     set_head_ip_bashrc_command = f"grep -q 'HEAD_NODE_IP' ~/.bashrc || echo 'export HEAD_NODE_IP={login_node_private_ip}' >> ~/.bashrc"
@@ -632,7 +659,7 @@ def setup_ray_processes(cluster_info, skip_mirror):
     run_commands_ssh(login_node["PublicIp"], "ec2-user", [ray_command_head])
     for i in range(len(onprem_worker_nodes)):
         node = onprem_worker_nodes[i]
-        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", [ray_onprem_worker_commands[i]])
+        run_commands_ssh_via_login(login_node["PublicIp"], "ec2-user", node["PrivateIp"], "ec2-user", [ray_onprem_worker_commands[i]], True)
     for i in range(len(cloud_nodes)):
         node = cloud_nodes[i]
         run_commands_ssh(node["PublicIp"], "ec2-user", [ray_cloud_worker_commands[i]])

@@ -1,0 +1,1 @@
+ray start --address 10.0.0.85:6379 --node-ip-address=10.0.1.120 --num-cpus 16 --num-gpus 0 --min-worker-port 30010 --max-worker-port 30090 --node-manager-port 30008 --object-manager-port 30009 --redis-password=12345678 --resources='{"binding":1}'
